@@ -39,6 +39,7 @@
 
       <h2 class="label-caps">RSVPs</h2><div id="rsvps"></div>
       <h2 class="label-caps">Potluck claims</h2><div id="claims"></div>
+      <h2 class="label-caps">Folding chairs</h2><div id="chairs"></div>
       <h2 class="label-caps">Fill-in items</h2><div id="extras"></div>
     </div>
   </section>
@@ -68,12 +69,15 @@ function render() {
   $("#rsvps").innerHTML = data.rsvps.map((r) => `<div class="entry"><div class="top"><div>
       <b>${esc(r.name)}</b> ${r.attending ? `<span class="success">· coming (${r.party_size || "?"})</span>` : `<span class="muted">· can’t make it</span>`}
       ${r.guest_names ? `<p class="small">${esc(r.guest_names)}</p>` : ""}
-      ${[r.phone, r.email, r.chairs ? `${r.chairs} chair(s)` : ""].filter(Boolean).length ? `<p class="small">${[r.phone, r.email, r.chairs ? `${r.chairs} chair(s)` : ""].filter(Boolean).map(esc).join(" · ")}</p>` : ""}
+      ${[r.phone, r.email].filter(Boolean).length ? `<p class="small">${[r.phone, r.email].filter(Boolean).map(esc).join(" · ")}</p>` : ""}
       ${r.notes ? `<p class="small">Note: ${esc(r.notes)}</p>` : ""}</div>
       <button class="x" data-del-rsvp="${r.id}">Remove</button></div></div>`).join("") || `<p class="small">No RSVPs yet.</p>`;
   $("#claims").innerHTML = data.claims.map((c) => `<div class="entry"><div class="top"><div><b>${esc(c.item)}</b> — ${esc(c.name)}
       ${c.contact ? `<p class="small">${esc(c.contact)}</p>` : ""}</div><button class="x" data-unclaim="${esc(c.item)}">Release</button></div></div>`).join("") || `<p class="small">Nothing claimed yet.</p>`;
-  $("#extras").innerHTML = data.extras.map((x) => `<div class="entry"><div class="top"><div><b>${esc(x.dish)}</b> — ${esc(x.name)}${x.category ? `<p class="small">${esc(x.category)}${x.contact ? ` · ${esc(x.contact)}` : ""}</p>` : ""}</div>
+  const chairRows = data.extras.filter((x) => x.category === "Folding chairs");
+  $("#chairs").innerHTML = chairRows.map((x) => `<div class="entry"><div class="top"><div><b>${esc(x.dish)} chair(s)</b> — ${esc(x.name)}${x.contact ? `<p class="small">${esc(x.contact)}</p>` : ""}</div>
+      <button class="x" data-del-extra="${x.id}">Remove</button></div></div>`).join("") || `<p class="small">No chairs pledged yet.</p>`;
+  $("#extras").innerHTML = data.extras.filter((x) => x.category !== "Folding chairs").map((x) => `<div class="entry"><div class="top"><div><b>${x.category === "Folding chairs" ? `${esc(x.dish)} folding chair(s)` : esc(x.dish)}</b> — ${esc(x.name)}${x.category ? `<p class="small">${esc(x.category)}${x.contact ? ` · ${esc(x.contact)}` : ""}</p>` : ""}</div>
       <button class="x" data-del-extra="${x.id}">Remove</button></div></div>`).join("") || `<p class="small">None yet.</p>`;
 }
 $("#login").addEventListener("submit", (e) => { e.preventDefault(); key = $("#key").value.trim(); load(); });
@@ -96,9 +100,11 @@ function confirmInline(btn) {
 }
 $("#copy").addEventListener("click", async () => {
   const L = ["LET’S GET BASTED! — Friendsgiving Potluck", `Guests coming: ${data.guests} · Chairs: ${data.chairs}`, "", "RSVPs:"];
-  data.rsvps.forEach((r) => L.push(`- ${r.name}: ${r.attending ? `coming (${r.party_size || "?"})` : "can’t make it"}${r.guest_names ? ` — ${r.guest_names}` : ""}${r.phone ? ` · ${r.phone}` : ""}${r.email ? ` · ${r.email}` : ""}${r.chairs ? ` · ${r.chairs} chairs` : ""}${r.notes ? ` · Note: ${r.notes}` : ""}`));
+  data.rsvps.forEach((r) => L.push(`- ${r.name}: ${r.attending ? `coming (${r.party_size || "?"})` : "can’t make it"}${r.guest_names ? ` — ${r.guest_names}` : ""}${r.phone ? ` · ${r.phone}` : ""}${r.email ? ` · ${r.email}` : ""}${r.notes ? ` · Note: ${r.notes}` : ""}`));
+  L.push("", "Folding chairs:"); data.extras.filter((x) => x.category === "Folding chairs").forEach((x) => L.push(`- ${x.name}: ${x.dish}`));
   L.push("", "Potluck:"); data.claims.forEach((c) => L.push(`- ${c.item} — ${c.name}`));
-  if (data.extras.length) { L.push("", "Extras:"); data.extras.forEach((x) => L.push(`- ${x.dish} — ${x.name}${x.category ? ` (${x.category})` : ""}`)); }
+  const fill = data.extras.filter((x) => x.category !== "Folding chairs");
+  if (fill.length) { L.push("", "Extras:"); fill.forEach((x) => L.push(x.category === "Folding chairs" ? `- ${x.dish} folding chair(s) — ${x.name}` : `- ${x.dish} — ${x.name}${x.category ? ` (${x.category})` : ""}`)); }
   try { await navigator.clipboard.writeText(L.join("\n")); $("#copy").textContent = "Copied!"; } catch (e) { $("#copy").textContent = "Couldn’t copy"; }
   setTimeout(() => ($("#copy").textContent = "Copy everything as text"), 2500);
 });

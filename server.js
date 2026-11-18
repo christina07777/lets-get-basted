@@ -20,6 +20,10 @@ const POTLUCK = [
 const RENAMES = { "Water / sparkling water": "Water" };
 const WRITE_IN = new Set(["Appetizers", "Sides & Favorites", "Desserts", "Drinks", "Supplies & Extras"]);
 const ALL_ITEMS = POTLUCK.flatMap(([, items]) => items);
+// Folding chairs: many people can pledge, each with a count. Shown at the top of Supplies & Extras.
+const CHAIRS = "Folding chairs";
+const CHAIRS_CATEGORY = "Supplies & Extras";
+const CHAIRS_NOTE = "We need folding chairs for two spots: around the tables for dinner AND out on the lawn for hanging out. Bring as many as you can!";
 
 // ---------- storage ----------
 const clean = (v, max = 200) => (typeof v === "string" ? v.trim().slice(0, max) : "");
@@ -67,6 +71,7 @@ function makeStore() {
       async extras() { return (await q(`SELECT id,name,dish,category,contact,created_at FROM extras ORDER BY created_at`)).rows; },
       async addExtra(name, dish, category, contact) { await q(`INSERT INTO extras (name,dish,category,contact) VALUES ($1,$2,$3,$4)`, [name, dish, category || null, contact || null]); },
       async deleteExtra(id) { await q(`DELETE FROM extras WHERE id=$1`, [id]); },
+      async clearChairs(name) { await q(`DELETE FROM extras WHERE category=$1 AND lower(trim(name))=lower(trim($2))`, [CHAIRS, name]); },
       async rsvps() { return (await q(`SELECT * FROM rsvps ORDER BY created_at`)).rows; },
       async deleteRsvp(id) { await q(`DELETE FROM rsvps WHERE id=$1`, [id]); },
       async allClaims() { return (await q(`SELECT * FROM claims ORDER BY created_at`)).rows; },
@@ -93,6 +98,7 @@ function makeStore() {
     async extras() { return data.extras; },
     async addExtra(name, dish, category, contact) { data.extras.push({ id: data.seq++, name, dish, category: category || null, contact: contact || null, created_at: now() }); save(); },
     async deleteExtra(id) { data.extras = data.extras.filter((e) => e.id !== id); save(); },
+    async clearChairs(name) { const n = name.trim().toLowerCase(); data.extras = data.extras.filter((e) => !(e.category === CHAIRS && String(e.name).trim().toLowerCase() === n)); save(); },
     async rsvps() { return data.rsvps; },
     async deleteRsvp(id) { data.rsvps = data.rsvps.filter((r) => r.id !== id); save(); },
     async allClaims() { return data.claims; },
@@ -122,8 +128,21 @@ app.post("/api/rsvp", wrap(async (req, res) => {
   };
   if (!r.name) return res.status(400).json({ error: "Please add your name." });
   const id = await store.addRsvp(r);
+  // Chairs from the RSVP go into the same pledge list the potluck page and dashboard use.
+  if (r.attending && r.chairs) await setChairs(r.name, Math.min(r.chairs, 50), r.phone || r.email);
   res.json({ ok: true, id });
 }));
+
+// One chair pledge per person (by name): a new number replaces their old one, so nothing is double-counted.
+async function setChairs(name, qty, contact) {
+  await store.clearChairs(name);
+  await store.addExtra(name, String(qty), CHAIRS, contact);
+}
+
+function chairInfo(extras) {
+  const pledges = extras.filter((x) => x.category === CHAIRS).map((x) => ({ name: x.name, qty: int(x.dish) }));
+  return { label: CHAIRS, note: CHAIRS_NOTE, pledges, total: pledges.reduce((n, p) => n + p.qty, 0) };
+}
 
 app.get("/api/potluck", wrap(async (_req, res) => {
   const claims = await store.claims();
@@ -136,8 +155,9 @@ app.get("/api/potluck", wrap(async (_req, res) => {
       name, writeIn: WRITE_IN.has(name),
       items: items.map((item) => ({ item, by: byItem[item] || null })),
       extras: extras.filter((x) => x.category === name).map(({ name: n, dish }) => ({ name: n, dish })),
+      chairs: name === CHAIRS_CATEGORY ? chairInfo(extras) : undefined,
     })),
-    extras: extras.filter((x) => !WRITE_IN.has(x.category)).map(({ name, dish }) => ({ name, dish })),
+    extras: extras.filter((x) => !WRITE_IN.has(x.category) && x.category !== CHAIRS).map(({ name, dish }) => ({ name, dish })),
   });
 }));
 
@@ -160,13 +180,15 @@ app.post("/api/signup", wrap(async (req, res) => {
   const writeins = Array.isArray(req.body?.writeins) ? req.body.writeins
     .map((w) => ({ category: clean(w?.category, 60), dish: clean(w?.dish, 200) }))
     .filter((w) => w.dish && WRITE_IN.has(w.category)).slice(0, 10) : [];
+  const chairs = Math.min(int(req.body?.chairs), 50);
   if (!name) return res.status(400).json({ error: "Please add your name." });
-  if (!items.length && !writeins.length) return res.status(400).json({ error: "Pick an item or type one in first." });
+  if (!items.length && !writeins.length && !chairs) return res.status(400).json({ error: "Pick an item or type one in first." });
   const claimed = [], taken = [];
   for (const item of items) ((await store.claim(item, name, contact)) ? claimed : taken).push(item);
   for (const w of writeins) await store.addExtra(name, w.dish, w.category, contact);
-  if (!claimed.length && !writeins.length) return res.status(409).json({ error: `Someone just claimed ${taken.join(", ")}. Pick something else?`, taken });
-  res.json({ ok: true, claimed, taken, added: writeins.map((w) => w.dish) });
+  if (chairs) await setChairs(name, chairs, contact);
+  if (!claimed.length && !writeins.length && !chairs) return res.status(409).json({ error: `Someone just claimed ${taken.join(", ")}. Pick something else?`, taken });
+  res.json({ ok: true, claimed, taken, added: [...writeins.map((w) => w.dish), ...(chairs ? [`${chairs} folding chair${chairs > 1 ? "s" : ""}`] : [])] });
 }));
 
 app.post("/api/extra", wrap(async (req, res) => {
@@ -185,7 +207,7 @@ app.get("/api/admin", wrap(async (req, res) => {
   res.json({
     rsvps, claims: await store.allClaims(), extras: await store.extras(), totalItems: ALL_ITEMS.length,
     guests: yes.reduce((n, r) => n + (r.party_size || 0), 0),
-    chairs: yes.reduce((n, r) => n + (r.chairs || 0), 0),
+    chairs: chairInfo(await store.extras()).total,
   });
 }));
 app.delete("/api/admin/claim", wrap(async (req, res) => {

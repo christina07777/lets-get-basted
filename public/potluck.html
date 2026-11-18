@@ -25,6 +25,12 @@
     font-family:var(--display);font-weight:700;border:1.5px solid rgba(217,164,65,.7);background:transparent;color:var(--cream-100)}
   .pick[aria-pressed="true"]{background:linear-gradient(var(--parchment),var(--parchment-deep));color:var(--ink);border-color:var(--brass)}
   .item.selected{outline:1.5px solid var(--gold-500)}
+  .item.chairs{align-items:flex-start;padding:12px}
+  .chair-note{margin:6px 0 0;font:600 14px/1.4 var(--display);color:var(--cream-200)}
+  .chair-who{margin:6px 0 0;font:700 13px/1.4 var(--display);color:var(--gold-500)}
+  .qty{flex:none;width:92px;text-align:center}
+  .qty label{display:block;font:700 13px var(--display);color:var(--cream-200);margin-bottom:4px}
+  .qty input{text-align:center;padding:10px 6px}
   .writein{margin-top:6px}
   .writein label{font:600 14px var(--display);color:var(--cream-200);display:block;margin:10px 0 6px;text-align:left}
   .submit-box{position:sticky;bottom:12px;z-index:5;margin-top:var(--space-8);padding:var(--space-4);border-radius:var(--radius-lg);
@@ -86,7 +92,7 @@
 <script>
 const $ = (s) => document.querySelector(s);
 const me = $("#me"), contact = $("#contact"), err = $("#err"), submitBtn = $("#submit");
-let mine = [], sel = new Set(), writeVals = {}, last = null;
+let mine = [], sel = new Set(), writeVals = {}, chairQty = 0, last = null;
 try {
   const g = JSON.parse(localStorage.getItem("basted-guest") || "null");
   if (g) { me.value = g.name || ""; contact.value = g.phone || g.email || ""; }
@@ -116,6 +122,15 @@ function render(d) {
   for (const s of [...sel]) if (!open.has(s)) sel.delete(s);
   $("#list").innerHTML = d.categories.map((c) => `
     <div class="cat"><h3 class="label-caps">${esc(c.name)}</h3>
+      ${c.chairs ? `
+        <div class="item chairs ${chairQty ? "selected" : ""}">
+          <div class="what">${esc(c.chairs.label)}
+            <p class="chair-note">${esc(c.chairs.note)}</p>
+            <p class="chair-who">${c.chairs.total ? `${c.chairs.total} pledged so far: ${c.chairs.pledges.map((x) => `${esc(x.name)} (${x.qty})`).join(", ")}` : "None pledged yet"}</p>
+          </div>
+          <div class="qty"><label for="chair-qty">How many?</label>
+            <input type="number" id="chair-qty" inputmode="numeric" min="0" max="50" placeholder="0" value="${chairQty || ""}"></div>
+        </div>` : ""}
       ${c.items.map((i) => i.by ? `
         <div class="item ${mine.includes(i.item) ? "mine" : ""}">
           <span class="what">${esc(i.item)}</span>
@@ -138,7 +153,7 @@ function render(d) {
 }
 
 function updateSummary() {
-  const picks = [...sel, ...Object.values(writeVals).map((v) => v.trim()).filter(Boolean)];
+  const picks = [...sel, ...Object.values(writeVals).map((v) => v.trim()).filter(Boolean), ...(chairQty ? [`${chairQty} folding chair${chairQty > 1 ? "s" : ""}`] : [])];
   $("#summary").textContent = picks.length ? `You’re bringing: ${picks.join(", ")}` : "Pick items above or type something in, then submit.";
 }
 
@@ -152,6 +167,10 @@ $("#list").addEventListener("click", (e) => {
   updateSummary();
 });
 $("#list").addEventListener("input", (e) => {
+  if (e.target.id === "chair-qty") {
+    chairQty = Math.max(0, Math.min(50, parseInt(e.target.value, 10) || 0));
+    e.target.closest(".item").classList.toggle("selected", chairQty > 0); updateSummary(); return;
+  }
   if (e.target.dataset.cat) { writeVals[e.target.dataset.cat] = e.target.value; updateSummary(); }
 });
 
@@ -160,11 +179,11 @@ submitBtn.addEventListener("click", async () => {
   const writeins = Object.entries(writeVals).map(([category, dish]) => ({ category, dish: dish.trim() })).filter((w) => w.dish);
   const items = [...sel];
   if (!me.value.trim()) { err.textContent = "Add your name at the top first."; me.focus(); me.scrollIntoView({ block: "center" }); return; }
-  if (!items.length && !writeins.length) { err.textContent = "Pick something or type it in first."; return; }
+  if (!items.length && !writeins.length && !chairQty) { err.textContent = "Pick something or type it in first."; return; }
   submitBtn.disabled = true; submitBtn.textContent = "Submitting…";
   try {
     const r = await fetch("/api/signup", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: me.value, contact: contact.value, items, writeins }) });
+      body: JSON.stringify({ name: me.value, contact: contact.value, items, writeins, chairs: chairQty }) });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.error || "Couldn’t submit. Please try again.");
     mine.push(...j.claimed);
@@ -172,7 +191,7 @@ submitBtn.addEventListener("click", async () => {
       localStorage.setItem("basted-claims", JSON.stringify(mine));
       const g = JSON.parse(localStorage.getItem("basted-guest") || "{}"); g.name = me.value.trim(); localStorage.setItem("basted-guest", JSON.stringify(g));
     } catch (e2) {}
-    sel.clear(); writeVals = {};
+    sel.clear(); writeVals = {}; chairQty = 0;
     const got = [...j.claimed, ...j.added];
     toast(`Thanks! You’re bringing ${got.join(", ")}.`);
     if (j.taken && j.taken.length) err.textContent = `Heads up: someone already claimed ${j.taken.join(", ")}.`;
