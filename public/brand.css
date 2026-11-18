@@ -120,20 +120,36 @@ footer{text-align:center;margin-top:var(--space-6)}
 .donate-card{position:relative;text-align:left;padding:var(--space-6) var(--space-4) var(--space-4);border-radius:var(--radius-lg);
   background:linear-gradient(180deg,rgba(247,197,72,.10),rgba(92,22,40,.55) 40%);border:2px solid var(--gold-500);
   box-shadow:0 0 22px rgba(255,179,71,.22),var(--card)}
-.donate-head{display:flex;gap:var(--space-3);align-items:flex-start}
+.donate-head{display:flex;gap:var(--space-3);align-items:center}
 .donate-head .gift,.donate-thanks .gift{width:40px;height:40px;flex:none;fill:var(--gold-500);filter:drop-shadow(0 0 8px rgba(255,179,71,.5))}
-.donate-head h3{margin:0;font:900 19px/1.2 var(--display);letter-spacing:.1em;text-transform:uppercase;
+.donate-head h3{margin:0;font:900 26px/1.05 var(--display);letter-spacing:.12em;text-transform:uppercase;
   background:linear-gradient(var(--gold-200),var(--gold-500) 45%,var(--gold-700));-webkit-background-clip:text;background-clip:text;color:transparent}
-.donate-head h3 span{font:600 13px var(--display);letter-spacing:0;text-transform:none;-webkit-text-fill-color:var(--cream-200)}
-.donate-head p{margin:6px 0 var(--space-4);font:600 14px/1.45 var(--display);color:var(--cream-100)}
-.donate-card .amounts{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--space-2)}
+.donate-head .opt{margin:2px 0 0;font:700 12px/1 var(--display);letter-spacing:.14em;text-transform:uppercase;color:var(--cream-200)}
+.donate-copy{margin:var(--space-3) 0 var(--space-2);font:600 15px/1.45 var(--display);color:var(--cream-100)}
+.suggest{margin:0 0 var(--space-3);padding:8px 12px;border-radius:var(--radius-md);background:rgba(247,197,72,.12);border:1px solid rgba(247,197,72,.4);
+  font:600 14px/1.35 var(--display);color:var(--cream-100)}
+.suggest b{color:var(--gold-500)}
+/* Animated CHIP IN: gold shimmer sweep + a little gift wiggle */
+.chip-title .shine{background:linear-gradient(100deg,var(--gold-700) 0%,var(--gold-500) 35%,#fffbe8 50%,var(--gold-500) 65%,var(--gold-700) 100%);
+  background-size:250% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:chip-shine 2.8s ease-in-out infinite}
+@keyframes chip-shine{0%{background-position:100% 0}60%,100%{background-position:-150% 0}}
+.donate-head .gift{animation:gift-wiggle 2.8s ease-in-out infinite;transform-origin:50% 85%}
+@keyframes gift-wiggle{0%,62%,100%{transform:rotate(0)}68%{transform:rotate(-10deg) scale(1.06)}74%{transform:rotate(9deg) scale(1.06)}80%{transform:rotate(-5deg)}86%{transform:rotate(0)}}
+@media (prefers-reduced-motion:reduce){.chip-title .shine,.donate-head .gift{animation:none}.chip-title .shine{background-position:30% 0}}
+.donate-card .amounts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--space-2)}
 .donate-card .amt{min-height:48px;border-radius:var(--radius-pill);border:1.5px solid rgba(217,164,65,.8);background:transparent;color:var(--cream-100);font:800 17px var(--display);cursor:pointer}
 .donate-card .amt[aria-pressed="true"]{background:linear-gradient(var(--parchment),var(--parchment-deep));color:var(--ink);border-color:var(--brass)}
-.donate-card .amt-other{text-align:center;padding:10px 2px;font-size:15px;border-radius:var(--radius-pill);min-height:48px}
+.donate-card .amt{display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.05}
+.donate-card .amt small{font:700 9px/1 var(--display);letter-spacing:.02em;text-transform:uppercase;color:var(--gold-500);margin-top:2px}
+.donate-card .amt[aria-pressed="true"] small{color:var(--ink)}
+.donate-card .amt-other{min-width:0;text-align:center;padding:10px 0;font-size:14px;border-radius:var(--radius-pill);min-height:48px;
+  border:1.5px solid rgba(217,164,65,.8);background:transparent;color:var(--cream-100)}
+.donate-card .amt-other::placeholder{color:var(--cream-100);opacity:1;font-weight:800}
 .pay-label{margin:var(--space-4) 0 6px;font:900 12px/1.2 var(--display);letter-spacing:.12em;text-transform:uppercase;color:var(--gold-500)}
 .pay-label span{font:600 12px var(--display);letter-spacing:0;text-transform:none;color:var(--cream-200)}
-.pay-row{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2)}
-.donate-card .pay{min-height:48px;padding:8px 6px;font-size:15px;flex-direction:column;gap:0;line-height:1.15}
+.pay-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:var(--space-2)}
+.donate-card .pay{min-width:0;min-height:48px;padding:8px 8px;font-size:clamp(12.5px,3.6vw,15px);flex-direction:column;gap:0;line-height:1.15;
+  overflow-wrap:anywhere;text-align:center}
 .donate-card .pay small{font:600 12px var(--display);color:var(--cream-200)}
 .donate-card .pay.chosen{border-color:var(--gold-500);background:rgba(247,197,72,.12)}
 .pay-foot{margin:var(--space-3) 0 0;font:600 13px/1.4 var(--display);color:var(--cream-200)}

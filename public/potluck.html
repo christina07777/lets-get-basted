@@ -10,7 +10,7 @@
 <meta property="og:image" content="/img/scene.jpg">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500..900&family=Playfair+Display:ital,wght@1,700&display=swap">
-<link rel="stylesheet" href="/brand.css">
+<link rel="stylesheet" href="/brand.css?v=3">
 <style>
   .cat{margin-top:44px}
   .cat:first-child{margin-top:var(--space-8)}
@@ -129,7 +129,7 @@
   <nav class="site-nav bottom" aria-label="Party pages"></nav>
 </main>
 
-<script src="/donate.js"></script>
+<script src="/donate.js?v=3"></script>
 <script>
 const $ = (s) => document.querySelector(s);
 const me = $("#me"), contact = $("#contact"), err = $("#err"), submitBtn = $("#submit");
@@ -217,6 +217,8 @@ function render(d) {
 }
 
 function updateSummary() {
+  const bringing = sel.size > 0 || Object.values(writeVals).some((v) => v.trim()) || Object.values(countVals).some((q) => q > 0);
+  if (window.Donate) Donate.setNoDish(!bringing);
   const picks = [...sel, ...Object.values(writeVals).map((v) => v.trim()).filter(Boolean),
     ...Object.entries(countVals).filter(([, q]) => q > 0).map(([i, q]) => `${q} × ${i}`)];
   const donation = window.Donate ? Donate.value().donation : 0;
@@ -276,7 +278,9 @@ submitBtn.addEventListener("click", async () => {
     const thanks = [j.message ? "Comment posted!" : "", j.donation ? "Thank you for chipping in!" : ""].filter(Boolean).join(" ");
     toast(got.length ? `Thanks! You’re bringing ${got.join(", ")}. ${thanks}` : thanks || "Thanks!");
     if (j.donation) Donate.reset();
-    else setTimeout(() => Donate.prompt({ name: me.value.trim(), contact: contact.value.trim(), headline: "Thanks for signing up! One more thing…" }), 900);
+    else setTimeout(() => Donate.prompt({ name: me.value.trim(), contact: contact.value.trim(),
+      noDish: !(items.length || writeins.length || Object.keys(counts).length),
+      headline: "Thanks for signing up! One more thing…" }), 900);
     if (j.taken && j.taken.length) err.textContent = `Heads up: someone already claimed ${j.taken.join(", ")}.`;
   } catch (e3) { err.textContent = e3.message; }
   submitBtn.disabled = false; submitBtn.textContent = "Submit my sign-up";
@@ -286,6 +290,6 @@ submitBtn.addEventListener("click", async () => {
 load(true);
 setInterval(() => { if (!document.hidden) load(false); }, 20000);
 </script>
-<script src="/nav.js"></script>
+<script src="/nav.js?v=3"></script>
 </body>
 </html>
