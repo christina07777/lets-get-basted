@@ -8,7 +8,7 @@
 
   function boxHTML(id, standalone) {
     return '<div class="donate-card" id="' + id + '">' +
-      '<div class="donate-head">' + GIFT + '<div><h3>Chip in <span>(totally optional)</span></h3>' +
+      '<div class="donate-head">' + GIFT + '<div><h3>Chip in <span>(optional)</span></h3>' +
       '<p>Hosting a party this size adds up, so we may need a little extra to cover costs. If you’d like to pitch in, instead of a dish or on top of one, we’d be so grateful. <b>It’s never required</b>, just come hungry!</p></div></div>' +
       '<div class="amounts" role="group" aria-label="Donation amount">' +
         [10, 20, 30].map(function (a) { return '<button type="button" class="amt" data-amt="' + a + '" aria-pressed="false">$' + a + '</button>'; }).join("") +
