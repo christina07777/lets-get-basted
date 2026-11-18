@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Potluck Sign-Up · Let’s Get Basted!</title>
+<meta property="og:title" content="Potluck Sign-Up · Let’s Get Basted!">
+<meta property="og:description" content="Claim what you’re bringing to Friendsgiving.">
+<meta property="og:image" content="/img/scene.jpg">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500..900&family=Playfair+Display:ital,wght@1,700&display=swap">
+<link rel="stylesheet" href="/brand.css">
+<style>
+  .cat{margin-top:var(--space-6)}
+  .cat h3{margin:0 0 var(--space-2);text-align:left}
+  .item{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);min-height:56px;padding:8px 12px;
+    border-radius:var(--radius-md);margin-bottom:6px;background:rgba(92,22,40,.55)}
+  .item .what{font:700 16px/1.25 var(--display);text-align:left}
+  .item .who{font:600 14px/1.3 var(--display);color:var(--cream-200);text-align:right;display:flex;align-items:center;gap:6px;flex:none}
+  .item .who svg{width:16px;height:16px;flex:none}
+  .item.mine{outline:1.5px solid var(--gold-500)}
+  .claim{min-height:44px;padding:6px 18px;font-size:15px;flex:none}
+  .open{display:none}
+  .extras li{margin:6px 0;text-align:left}
+  .extras{list-style:none;padding:0;margin:var(--space-3) 0 0}
+  .you{background:rgba(92,22,40,.55);border-radius:var(--radius-md);padding:var(--space-4);margin:var(--space-6) 0 0}
+  .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);max-width:92vw;padding:12px 20px;border-radius:var(--radius-pill);
+    background:var(--parchment);color:var(--ink);font:700 15px var(--display);border:2px solid var(--brass);box-shadow:var(--card);z-index:9}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="spark" viewBox="-12 -12 24 24"><path d="M0 -12 C1.6 -2 2 -1.6 12 0 C2 1.6 1.6 2 0 12 C-1.6 2 -2 1.6 -12 0 C-2 -1.6 -1.6 -2 0 -12Z"/></symbol>
+  <symbol id="check" viewBox="0 0 16 16"><path d="M3 8.5l3 3 7-7" fill="none" stroke="#f7c548" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+</svg>
+<main class="page">
+  <div class="hero"><img src="/img/scene.jpg" width="1200" height="809" alt="Three turkeys at a Friendsgiving party: one passed out with an empty pie tin on its belly, one diva singing karaoke, one sneaking pie in the background."></div>
+  <img class="lights" src="/img/lights.svg" alt="">
+
+  <section class="card">
+    <svg class="spark tl" aria-hidden="true"><use href="#spark"/></svg><svg class="spark tr" aria-hidden="true"><use href="#spark"/></svg>
+    <svg class="spark bl" aria-hidden="true"><use href="#spark"/></svg><svg class="spark br" aria-hidden="true"><use href="#spark"/></svg>
+    <div class="center">
+      <p class="eyebrow">Friendsgiving Potluck</p>
+      <h1 class="page-title">Potluck Sign-Up</h1>
+      <h2 class="heading" style="margin-top:var(--space-3)">What are you bringing?</h2>
+      <p class="small" style="margin:0 0 var(--space-3)">Tap <b>Claim</b> on anything that’s still open. BYOB.</p>
+      <span class="badge" id="count" aria-live="polite">Loading…</span>
+    </div>
+
+    <div class="you">
+      <div class="row2">
+        <div class="field" style="margin:0"><label for="me">Your name</label>
+          <input type="text" id="me" autocomplete="name" placeholder="Your name"></div>
+        <div class="field" style="margin:0"><label for="contact">Phone or email <span class="hint">(optional)</span></label>
+          <input type="text" id="contact" autocomplete="tel" placeholder="So we can reach you"></div>
+      </div>
+    </div>
+
+    <div id="list"><p class="small center" style="margin-top:var(--space-6)">Loading the menu…</p></div>
+    <p class="error center" id="err" role="alert"></p>
+
+    <div class="divider"><svg aria-hidden="true"><use href="#spark"/></svg></div>
+
+    <h3 class="label-caps" style="margin:0">Bringing something else?</h3>
+    <form id="extra-form" class="row2" style="margin-top:var(--space-3);align-items:end" novalidate>
+      <div class="field" style="margin:0"><label for="dish">Dish or item</label>
+        <input type="text" id="dish" placeholder="e.g. Grandma’s deviled eggs"></div>
+      <button class="btn btn-secondary" type="submit">Add it</button>
+    </form>
+    <ul class="extras" id="extras"></ul>
+
+    <p class="joke center" style="margin-top:var(--space-8)">Stretchy pants recommended.</p>
+  </section>
+
+  <p class="center small">Haven’t RSVP’d yet? <a href="/">RSVP here</a> · or text Shannon <a href="sms:+17542441524">(754) 244-1524</a> • Christina <a href="sms:+19548542207">(954) 854-2207</a></p>
+</main>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const me = $("#me"), contact = $("#contact"), err = $("#err");
+let mine = [];
+try {
+  const g = JSON.parse(localStorage.getItem("basted-guest") || "null");
+  if (g) { me.value = g.name || ""; contact.value = g.phone || g.email || ""; }
+  mine = JSON.parse(localStorage.getItem("basted-claims") || "[]");
+} catch (e) {}
+
+function toast(msg) {
+  const t = document.createElement("div"); t.className = "toast"; t.textContent = msg; document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3200);
+}
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+async function load() {
+  try {
+    const r = await fetch("/api/potluck", { cache: "no-store" });
+    if (!r.ok) throw new Error();
+    render(await r.json());
+  } catch (e) { err.textContent = "Couldn’t load the list. Pull down to refresh."; }
+}
+
+function render(d) {
+  $("#count").textContent = `${d.claimed} of ${d.total} claimed`;
+  $("#list").innerHTML = d.categories.map((c) => `
+    <div class="cat"><h3 class="label-caps">${esc(c.name)}</h3>
+      ${c.items.map((i) => `
+        <div class="item ${i.by && mine.includes(i.item) ? "mine" : ""}">
+          <span class="what">${esc(i.item)}</span>
+          ${i.by
+            ? `<span class="who"><svg aria-hidden="true"><use href="#check"/></svg>${esc(i.by)}</span>`
+            : `<button class="btn btn-primary claim" data-item="${esc(i.item)}" aria-label="Claim ${esc(i.item)}">Claim</button>`}
+        </div>`).join("")}
+    </div>`).join("");
+  $("#extras").innerHTML = d.extras.map((x) => `<li><span class="small">✦</span> <b>${esc(x.dish)}</b> <span class="muted">— ${esc(x.name)}</span></li>`).join("");
+}
+
+function remember() {
+  try {
+    const g = JSON.parse(localStorage.getItem("basted-guest") || "{}");
+    g.name = me.value.trim(); localStorage.setItem("basted-guest", JSON.stringify(g));
+  } catch (e) {}
+}
+
+$("#list").addEventListener("click", async (e) => {
+  const b = e.target.closest("button.claim"); if (!b) return;
+  err.textContent = "";
+  if (!me.value.trim()) { err.textContent = "Add your name above first, then tap Claim."; me.focus(); return; }
+  b.disabled = true; b.textContent = "…";
+  try {
+    const r = await fetch("/api/claim", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ item: b.dataset.item, name: me.value, contact: contact.value }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || "Couldn’t claim that. Try again.");
+    mine.push(b.dataset.item); try { localStorage.setItem("basted-claims", JSON.stringify(mine)); } catch (e2) {}
+    remember();
+    toast(`Thanks! You’re bringing ${b.dataset.item}.`);
+  } catch (e3) { err.textContent = e3.message; }
+  load();
+});
+
+$("#extra-form").addEventListener("submit", async (e) => {
+  e.preventDefault(); err.textContent = "";
+  const dish = $("#dish");
+  if (!me.value.trim()) { err.textContent = "Add your name above first."; me.focus(); return; }
+  if (!dish.value.trim()) { dish.focus(); return; }
+  const r = await fetch("/api/extra", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: me.value, dish: dish.value }) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) { err.textContent = j.error || "Couldn’t add that. Try again."; return; }
+  remember(); toast(`Added: ${dish.value.trim()}`); dish.value = ""; load();
+});
+
+load();
+setInterval(() => { if (!document.hidden) load(); }, 20000);
+</script>
+</body>
+</html>

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Hosts · Let’s Get Basted!</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500..900&family=Playfair+Display:ital,wght@1,700&display=swap">
+<link rel="stylesheet" href="/brand.css">
+<style>
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-2);margin:var(--space-4) 0}
+  .stat{background:var(--cranberry-800);border-radius:var(--radius-md);padding:12px 8px;text-align:center}
+  .stat b{display:block;font:900 28px/1 var(--display);color:var(--gold-500)}
+  .entry{background:rgba(92,22,40,.55);border-radius:var(--radius-md);padding:12px 14px;margin-bottom:8px;text-align:left}
+  .entry .top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+  .entry p{margin:4px 0 0}
+  .x{background:none;border:1px solid rgba(255,143,134,.6);color:var(--coral);border-radius:var(--radius-pill);font:700 13px var(--display);padding:6px 12px;cursor:pointer;min-height:36px}
+  h2.label-caps{margin:var(--space-8) 0 var(--space-3)}
+</style>
+</head>
+<body>
+<main class="page">
+  <section class="card">
+    <div class="center"><p class="eyebrow">Hosts only</p><h1 class="page-title">Party Dashboard</h1></div>
+
+    <form id="login" style="margin-top:var(--space-6)">
+      <div class="field"><label for="key">Host key</label><input type="text" id="key" autocomplete="off" placeholder="The ADMIN_KEY you set on Render"></div>
+      <button class="btn btn-primary btn-block">Open dashboard</button>
+    </form>
+    <p class="error center" id="err" role="alert"></p>
+
+    <div id="dash" class="hidden">
+      <div class="stats">
+        <div class="stat"><b id="s-guests">0</b><span class="small">guests coming</span></div>
+        <div class="stat"><b id="s-items">0</b><span class="small">dishes claimed</span></div>
+        <div class="stat"><b id="s-chairs">0</b><span class="small">chairs pledged</span></div>
+      </div>
+      <button class="btn btn-secondary btn-block" id="copy">Copy everything as text</button>
+
+      <h2 class="label-caps">RSVPs</h2><div id="rsvps"></div>
+      <h2 class="label-caps">Potluck claims</h2><div id="claims"></div>
+      <h2 class="label-caps">Extra dishes</h2><div id="extras"></div>
+    </div>
+  </section>
+</main>
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+let key = sessionStorage.getItem("basted-key") || "", data = null;
+
+async function api(path, opts = {}) {
+  const r = await fetch(path, { ...opts, headers: { "Content-Type": "application/json", "x-admin-key": key } });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || "Request failed");
+  return j;
+}
+async function load() {
+  try {
+    data = await api("/api/admin");
+    sessionStorage.setItem("basted-key", key);
+    $("#login").classList.add("hidden"); $("#dash").classList.remove("hidden"); $("#err").textContent = "";
+    render();
+  } catch (e) { $("#err").textContent = e.message; }
+}
+function render() {
+  $("#s-guests").textContent = data.guests; $("#s-chairs").textContent = data.chairs;
+  $("#s-items").textContent = `${data.claims.length}/${data.totalItems}`;
+  $("#rsvps").innerHTML = data.rsvps.map((r) => `<div class="entry"><div class="top"><div>
+      <b>${esc(r.name)}</b> ${r.attending ? `<span class="success">· coming (${r.party_size || "?"})</span>` : `<span class="muted">· can’t make it</span>`}
+      ${r.guest_names ? `<p class="small">${esc(r.guest_names)}</p>` : ""}
+      ${[r.phone, r.email, r.chairs ? `${r.chairs} chair(s)` : ""].filter(Boolean).length ? `<p class="small">${[r.phone, r.email, r.chairs ? `${r.chairs} chair(s)` : ""].filter(Boolean).map(esc).join(" · ")}</p>` : ""}
+      ${r.notes ? `<p class="small">Note: ${esc(r.notes)}</p>` : ""}</div>
+      <button class="x" data-del-rsvp="${r.id}">Remove</button></div></div>`).join("") || `<p class="small">No RSVPs yet.</p>`;
+  $("#claims").innerHTML = data.claims.map((c) => `<div class="entry"><div class="top"><div><b>${esc(c.item)}</b> — ${esc(c.name)}
+      ${c.contact ? `<p class="small">${esc(c.contact)}</p>` : ""}</div><button class="x" data-unclaim="${esc(c.item)}">Release</button></div></div>`).join("") || `<p class="small">Nothing claimed yet.</p>`;
+  $("#extras").innerHTML = data.extras.map((x) => `<div class="entry"><div class="top"><div><b>${esc(x.dish)}</b> — ${esc(x.name)}</div>
+      <button class="x" data-del-extra="${x.id}">Remove</button></div></div>`).join("") || `<p class="small">None yet.</p>`;
+}
+$("#login").addEventListener("submit", (e) => { e.preventDefault(); key = $("#key").value.trim(); load(); });
+document.addEventListener("click", async (e) => {
+  const t = e.target;
+  try {
+    if (t.dataset.delRsvp && confirmInline(t)) await api(`/api/admin/rsvp/${t.dataset.delRsvp}`, { method: "DELETE" });
+    else if (t.dataset.unclaim && confirmInline(t)) await api(`/api/admin/claim`, { method: "DELETE", body: JSON.stringify({ item: t.dataset.unclaim }) });
+    else if (t.dataset.delExtra && confirmInline(t)) await api(`/api/admin/extra/${t.dataset.delExtra}`, { method: "DELETE" });
+    else return;
+    load();
+  } catch (err) { $("#err").textContent = err.message; }
+});
+// Two-tap confirm (no pop-up dialogs)
+function confirmInline(btn) {
+  if (btn.dataset.armed) return true;
+  btn.dataset.armed = "1"; const old = btn.textContent; btn.textContent = "Tap again";
+  setTimeout(() => { delete btn.dataset.armed; btn.textContent = old; }, 3000);
+  return false;
+}
+$("#copy").addEventListener("click", async () => {
+  const L = ["LET’S GET BASTED! — Friendsgiving Potluck", `Guests coming: ${data.guests} · Chairs: ${data.chairs}`, "", "RSVPs:"];
+  data.rsvps.forEach((r) => L.push(`- ${r.name}: ${r.attending ? `coming (${r.party_size || "?"})` : "can’t make it"}${r.guest_names ? ` — ${r.guest_names}` : ""}${r.phone ? ` · ${r.phone}` : ""}${r.email ? ` · ${r.email}` : ""}${r.chairs ? ` · ${r.chairs} chairs` : ""}${r.notes ? ` · Note: ${r.notes}` : ""}`));
+  L.push("", "Potluck:"); data.claims.forEach((c) => L.push(`- ${c.item} — ${c.name}`));
+  if (data.extras.length) { L.push("", "Extras:"); data.extras.forEach((x) => L.push(`- ${x.dish} — ${x.name}`)); }
+  try { await navigator.clipboard.writeText(L.join("\n")); $("#copy").textContent = "Copied!"; } catch (e) { $("#copy").textContent = "Couldn’t copy"; }
+  setTimeout(() => ($("#copy").textContent = "Copy everything as text"), 2500);
+});
+if (key) load();
+</script>
+</body>
+</html>
