@@ -78,6 +78,18 @@
     <h3 class="label-caps hidden" id="other-h" style="margin:var(--space-6) 0 0">Other</h3>
     <ul class="extras" id="extras"></ul>
 
+    <div class="divider"><svg aria-hidden="true"><use href="#spark"/></svg></div>
+    <div class="center">
+      <button type="button" class="btn btn-secondary" id="toggle-comment" aria-expanded="false" aria-controls="comment-box">Add a comment</button>
+      <p class="small" style="margin:var(--space-2) 0 0">Your comment shows on the <a href="/whos-coming">Who’s Coming</a> page.</p>
+    </div>
+    <div id="comment-box" class="hidden" style="margin-top:var(--space-4)">
+      <div class="field"><label for="excited">How are you excited to celebrate with everyone?</label>
+        <textarea id="excited" maxlength="500" placeholder="e.g. Can’t wait to eat my weight in stuffing with you all!"></textarea></div>
+      <div class="field"><label for="thankful">What are you most thankful for this year?</label>
+        <textarea id="thankful" maxlength="500" placeholder="e.g. Good friends, good health, and leftover pie"></textarea></div>
+    </div>
+
     <div class="submit-box">
       <p class="small summary" id="summary">Pick items above or type something in, then submit.</p>
       <button class="btn btn-primary btn-block" id="submit" type="button">Submit my sign-up</button>
@@ -86,6 +98,7 @@
     <p class="joke center" style="margin-top:var(--space-8)">Stretchy pants recommended.</p>
   </section>
 
+  <p class="center"><a class="btn btn-secondary" href="/whos-coming">See who’s coming →</a></p>
   <p class="center small">Haven’t RSVP’d yet? <a href="/">RSVP here</a> · or text Shannon <a href="sms:+17542441524">(754) 244-1524</a> • Christina <a href="sms:+19548542207">(954) 854-2207</a></p>
 </main>
 
@@ -154,7 +167,8 @@ function render(d) {
 
 function updateSummary() {
   const picks = [...sel, ...Object.values(writeVals).map((v) => v.trim()).filter(Boolean), ...(chairQty ? [`${chairQty} folding chair${chairQty > 1 ? "s" : ""}`] : [])];
-  $("#summary").textContent = picks.length ? `You’re bringing: ${picks.join(", ")}` : "Pick items above or type something in, then submit.";
+  const msg = ($("#excited").value.trim() || $("#thankful").value.trim()) ? "a comment" : "";
+  $("#summary").textContent = picks.length ? `You’re bringing: ${picks.join(", ")}${msg ? " + " + msg : ""}` : msg ? "Ready to post your comment." : "Pick items above or type something in, then submit.";
 }
 
 $("#list").addEventListener("click", (e) => {
@@ -166,6 +180,12 @@ $("#list").addEventListener("click", (e) => {
   b.closest(".item").classList.toggle("selected", on);
   updateSummary();
 });
+$("#toggle-comment").addEventListener("click", (e) => {
+  const box = $("#comment-box"), open = box.classList.toggle("hidden") === false;
+  e.currentTarget.setAttribute("aria-expanded", open); e.currentTarget.textContent = open ? "Hide comment" : "Add a comment";
+  if (open) $("#excited").focus();
+});
+$("#comment-box").addEventListener("input", updateSummary);
 $("#list").addEventListener("input", (e) => {
   if (e.target.id === "chair-qty") {
     chairQty = Math.max(0, Math.min(50, parseInt(e.target.value, 10) || 0));
@@ -179,11 +199,12 @@ submitBtn.addEventListener("click", async () => {
   const writeins = Object.entries(writeVals).map(([category, dish]) => ({ category, dish: dish.trim() })).filter((w) => w.dish);
   const items = [...sel];
   if (!me.value.trim()) { err.textContent = "Add your name at the top first."; me.focus(); me.scrollIntoView({ block: "center" }); return; }
-  if (!items.length && !writeins.length && !chairQty) { err.textContent = "Pick something or type it in first."; return; }
+  const excited = $("#excited").value.trim(), thankful = $("#thankful").value.trim();
+  if (!items.length && !writeins.length && !chairQty && !excited && !thankful) { err.textContent = "Pick something, type it in, or add a comment first."; return; }
   submitBtn.disabled = true; submitBtn.textContent = "Submitting…";
   try {
     const r = await fetch("/api/signup", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: me.value, contact: contact.value, items, writeins, chairs: chairQty }) });
+      body: JSON.stringify({ name: me.value, contact: contact.value, items, writeins, chairs: chairQty, excited, thankful }) });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.error || "Couldn’t submit. Please try again.");
     mine.push(...j.claimed);
@@ -193,7 +214,8 @@ submitBtn.addEventListener("click", async () => {
     } catch (e2) {}
     sel.clear(); writeVals = {}; chairQty = 0;
     const got = [...j.claimed, ...j.added];
-    toast(`Thanks! You’re bringing ${got.join(", ")}.`);
+    if (j.message) { $("#excited").value = ""; $("#thankful").value = ""; }
+    toast(got.length ? `Thanks! You’re bringing ${got.join(", ")}.${j.message ? " Comment posted!" : ""}` : "Thanks! Your comment is posted.");
     if (j.taken && j.taken.length) err.textContent = `Heads up: someone already claimed ${j.taken.join(", ")}.`;
   } catch (e3) { err.textContent = e3.message; }
   submitBtn.disabled = false; submitBtn.textContent = "Submit my sign-up";

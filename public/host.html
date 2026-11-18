@@ -21,7 +21,7 @@
 <body>
 <main class="page">
   <section class="card">
-    <div class="center"><p class="eyebrow">Hosts only</p><h1 class="page-title">Party Dashboard</h1></div>
+    <div class="center"><p class="eyebrow">Hosts only</p><h1 class="page-title">Party Dashboard</h1><p class="small"><a href="/whos-coming">Public “Who’s Coming” page →</a></p></div>
 
     <form id="login" style="margin-top:var(--space-6)">
       <div class="field"><label for="key">Host key</label><input type="text" id="key" autocomplete="off" placeholder="The ADMIN_KEY you set on Render"></div>
@@ -41,6 +41,7 @@
       <h2 class="label-caps">Potluck claims</h2><div id="claims"></div>
       <h2 class="label-caps">Folding chairs</h2><div id="chairs"></div>
       <h2 class="label-caps">Fill-in items</h2><div id="extras"></div>
+      <h2 class="label-caps">Comments</h2><div id="msgs"></div>
     </div>
   </section>
 </main>
@@ -64,6 +65,9 @@ async function load() {
   } catch (e) { $("#err").textContent = e.message; }
 }
 function render() {
+  $("#msgs").innerHTML = (data.messages || []).map((m) => `<div class="entry"><div class="top"><div><b>${esc(m.name)}</b>
+      ${m.excited ? `<p class="small">Excited: ${esc(m.excited)}</p>` : ""}${m.thankful ? `<p class="small">Thankful: ${esc(m.thankful)}</p>` : ""}</div>
+      <button class="x" data-del-msg="${m.id}">Remove</button></div></div>`).join("") || `<p class="small">No comments yet.</p>`;
   $("#s-guests").textContent = data.guests; $("#s-chairs").textContent = data.chairs;
   $("#s-items").textContent = `${data.claims.length}/${data.totalItems}`;
   $("#rsvps").innerHTML = data.rsvps.map((r) => `<div class="entry"><div class="top"><div>
@@ -86,6 +90,7 @@ document.addEventListener("click", async (e) => {
   try {
     if (t.dataset.delRsvp && confirmInline(t)) await api(`/api/admin/rsvp/${t.dataset.delRsvp}`, { method: "DELETE" });
     else if (t.dataset.unclaim && confirmInline(t)) await api(`/api/admin/claim`, { method: "DELETE", body: JSON.stringify({ item: t.dataset.unclaim }) });
+    else if (t.dataset.delMsg && confirmInline(t)) await api(`/api/admin/message/${t.dataset.delMsg}`, { method: "DELETE" });
     else if (t.dataset.delExtra && confirmInline(t)) await api(`/api/admin/extra/${t.dataset.delExtra}`, { method: "DELETE" });
     else return;
     load();
