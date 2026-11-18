@@ -7,14 +7,16 @@ const fs = require("fs");
 const PORT = process.env.PORT || 3000;
 const ADMIN_KEY = process.env.ADMIN_KEY || "";
 
-// The 28 potluck items, in order, by category.
+// Potluck items, in order, by category. Categories listed in WRITE_IN also get a fill-in blank.
 const POTLUCK = [
+  ["Appetizers", ["Charcuterie board", "Chips & dip", "Veggie tray", "Deviled eggs", "Spinach-artichoke dip"]],
   ["Main Dishes", ["Turkey", "Ham", "Gravy", "Vegetarian main dish"]],
   ["Sides & Favorites", ["Mashed potatoes", "Mac & cheese", "Stuffing / dressing", "Sweet potato casserole", "Green bean casserole", "Vegetable side", "Salad", "Cranberry sauce", "Dinner rolls & butter"]],
   ["Desserts", ["Pumpkin pie", "Apple or pecan pie", "Cake / brownies / cookies", "Other dessert"]],
   ["Drinks", ["Wine / cocktails", "Beer / seltzers", "Soda / juice", "Water / sparkling water", "Ice"]],
-  ["Supplies & Extras", ["Appetizers / charcuterie", "Plates & bowls", "Cups", "Napkins & utensils", "Serving utensils", "Take-home containers"]],
+  ["Supplies & Extras", ["Plates & bowls", "Cups", "Napkins & utensils", "Serving utensils", "Take-home containers"]],
 ];
+const WRITE_IN = new Set(["Appetizers", "Sides & Favorites", "Desserts", "Drinks", "Supplies & Extras"]);
 const ALL_ITEMS = POTLUCK.flatMap(([, items]) => items);
 
 // ---------- storage ----------
@@ -42,6 +44,8 @@ function makeStore() {
         await q(`CREATE TABLE IF NOT EXISTS extras (
           id SERIAL PRIMARY KEY, name TEXT NOT NULL, dish TEXT NOT NULL,
           created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+        await q(`ALTER TABLE extras ADD COLUMN IF NOT EXISTS category TEXT`);
+        await q(`ALTER TABLE extras ADD COLUMN IF NOT EXISTS contact TEXT`);
       },
       async addRsvp(r) {
         const { rows } = await q(
@@ -56,8 +60,8 @@ function makeStore() {
         return r.rowCount === 1;
       },
       async unclaim(item) { await q(`DELETE FROM claims WHERE item=$1`, [item]); },
-      async extras() { return (await q(`SELECT id,name,dish,created_at FROM extras ORDER BY created_at`)).rows; },
-      async addExtra(name, dish) { await q(`INSERT INTO extras (name,dish) VALUES ($1,$2)`, [name, dish]); },
+      async extras() { return (await q(`SELECT id,name,dish,category,contact,created_at FROM extras ORDER BY created_at`)).rows; },
+      async addExtra(name, dish, category, contact) { await q(`INSERT INTO extras (name,dish,category,contact) VALUES ($1,$2,$3,$4)`, [name, dish, category || null, contact || null]); },
       async deleteExtra(id) { await q(`DELETE FROM extras WHERE id=$1`, [id]); },
       async rsvps() { return (await q(`SELECT * FROM rsvps ORDER BY created_at`)).rows; },
       async deleteRsvp(id) { await q(`DELETE FROM rsvps WHERE id=$1`, [id]); },
@@ -80,7 +84,7 @@ function makeStore() {
     },
     async unclaim(item) { data.claims = data.claims.filter((c) => c.item !== item); save(); },
     async extras() { return data.extras; },
-    async addExtra(name, dish) { data.extras.push({ id: data.seq++, name, dish, created_at: now() }); save(); },
+    async addExtra(name, dish, category, contact) { data.extras.push({ id: data.seq++, name, dish, category: category || null, contact: contact || null, created_at: now() }); save(); },
     async deleteExtra(id) { data.extras = data.extras.filter((e) => e.id !== id); save(); },
     async rsvps() { return data.rsvps; },
     async deleteRsvp(id) { data.rsvps = data.rsvps.filter((r) => r.id !== id); save(); },
@@ -116,12 +120,17 @@ app.post("/api/rsvp", wrap(async (req, res) => {
 
 app.get("/api/potluck", wrap(async (_req, res) => {
   const claims = await store.claims();
+  const extras = await store.extras();
   const byItem = Object.fromEntries(claims.map((c) => [c.item, c.name]));
   res.json({
     total: ALL_ITEMS.length,
     claimed: claims.filter((c) => ALL_ITEMS.includes(c.item)).length,
-    categories: POTLUCK.map(([name, items]) => ({ name, items: items.map((item) => ({ item, by: byItem[item] || null })) })),
-    extras: (await store.extras()).map(({ name, dish }) => ({ name, dish })),
+    categories: POTLUCK.map(([name, items]) => ({
+      name, writeIn: WRITE_IN.has(name),
+      items: items.map((item) => ({ item, by: byItem[item] || null })),
+      extras: extras.filter((x) => x.category === name).map(({ name: n, dish }) => ({ name: n, dish })),
+    })),
+    extras: extras.filter((x) => !WRITE_IN.has(x.category)).map(({ name, dish }) => ({ name, dish })),
   });
 }));
 
@@ -134,6 +143,23 @@ app.post("/api/claim", wrap(async (req, res) => {
   const ok = await store.claim(item, name, contact);
   if (!ok) return res.status(409).json({ error: "Someone just claimed that one. Pick another?" });
   res.json({ ok: true });
+}));
+
+// One submit: claim picked items + add fill-ins.
+app.post("/api/signup", wrap(async (req, res) => {
+  const name = clean(req.body?.name, 100);
+  const contact = clean(req.body?.contact, 120);
+  const items = Array.isArray(req.body?.items) ? [...new Set(req.body.items.map((i) => clean(i, 100)))].filter((i) => ALL_ITEMS.includes(i)).slice(0, 20) : [];
+  const writeins = Array.isArray(req.body?.writeins) ? req.body.writeins
+    .map((w) => ({ category: clean(w?.category, 60), dish: clean(w?.dish, 200) }))
+    .filter((w) => w.dish && WRITE_IN.has(w.category)).slice(0, 10) : [];
+  if (!name) return res.status(400).json({ error: "Please add your name." });
+  if (!items.length && !writeins.length) return res.status(400).json({ error: "Pick an item or type one in first." });
+  const claimed = [], taken = [];
+  for (const item of items) ((await store.claim(item, name, contact)) ? claimed : taken).push(item);
+  for (const w of writeins) await store.addExtra(name, w.dish, w.category, contact);
+  if (!claimed.length && !writeins.length) return res.status(409).json({ error: `Someone just claimed ${taken.join(", ")}. Pick something else?`, taken });
+  res.json({ ok: true, claimed, taken, added: writeins.map((w) => w.dish) });
 }));
 
 app.post("/api/extra", wrap(async (req, res) => {

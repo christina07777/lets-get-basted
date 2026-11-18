@@ -21,6 +21,15 @@
   .item.mine{outline:1.5px solid var(--gold-500)}
   .claim{min-height:44px;padding:6px 18px;font-size:15px;flex:none}
   .open{display:none}
+  .pick{min-height:44px;padding:6px 16px;font-size:15px;flex:none;border-radius:var(--radius-pill);cursor:pointer;
+    font-family:var(--display);font-weight:700;border:1.5px solid rgba(217,164,65,.7);background:transparent;color:var(--cream-100)}
+  .pick[aria-pressed="true"]{background:linear-gradient(var(--parchment),var(--parchment-deep));color:var(--ink);border-color:var(--brass)}
+  .item.selected{outline:1.5px solid var(--gold-500)}
+  .writein{margin-top:6px}
+  .writein label{font:600 14px var(--display);color:var(--cream-200);display:block;margin:10px 0 6px;text-align:left}
+  .submit-box{position:sticky;bottom:12px;z-index:5;margin-top:var(--space-8);padding:var(--space-4);border-radius:var(--radius-lg);
+    background:var(--cranberry-800);border:1.5px solid rgba(217,164,65,.7);box-shadow:var(--card);text-align:center}
+  .submit-box .summary{margin:0 0 var(--space-3)}
   .extras li{margin:6px 0;text-align:left}
   .extras{list-style:none;padding:0;margin:var(--space-3) 0 0}
   .you{background:rgba(92,22,40,.55);border-radius:var(--radius-md);padding:var(--space-4);margin:var(--space-6) 0 0}
@@ -44,7 +53,7 @@
       <p class="eyebrow">Friendsgiving Potluck</p>
       <h1 class="page-title">Potluck Sign-Up</h1>
       <h2 class="heading" style="margin-top:var(--space-3)">What are you bringing?</h2>
-      <p class="small" style="margin:0 0 var(--space-3)">Tap <b>Claim</b> on anything that’s still open. BYOB.</p>
+      <p class="small" style="margin:0 0 var(--space-3)">Tap <b>Pick</b> on what you’ll bring, or type something in, then hit <b>Submit</b> at the bottom. BYOB.</p>
       <span class="badge" id="count" aria-live="polite">Loading…</span>
     </div>
 
@@ -60,15 +69,13 @@
     <div id="list"><p class="small center" style="margin-top:var(--space-6)">Loading the menu…</p></div>
     <p class="error center" id="err" role="alert"></p>
 
-    <div class="divider"><svg aria-hidden="true"><use href="#spark"/></svg></div>
-
-    <h3 class="label-caps" style="margin:0">Bringing something else?</h3>
-    <form id="extra-form" class="row2" style="margin-top:var(--space-3);align-items:end" novalidate>
-      <div class="field" style="margin:0"><label for="dish">Dish or item</label>
-        <input type="text" id="dish" placeholder="e.g. Grandma’s deviled eggs"></div>
-      <button class="btn btn-secondary" type="submit">Add it</button>
-    </form>
+    <h3 class="label-caps hidden" id="other-h" style="margin:var(--space-6) 0 0">Other</h3>
     <ul class="extras" id="extras"></ul>
+
+    <div class="submit-box">
+      <p class="small summary" id="summary">Pick items above or type something in, then submit.</p>
+      <button class="btn btn-primary btn-block" id="submit" type="button">Submit my sign-up</button>
+    </div>
 
     <p class="joke center" style="margin-top:var(--space-8)">Stretchy pants recommended.</p>
   </section>
@@ -78,8 +85,8 @@
 
 <script>
 const $ = (s) => document.querySelector(s);
-const me = $("#me"), contact = $("#contact"), err = $("#err");
-let mine = [];
+const me = $("#me"), contact = $("#contact"), err = $("#err"), submitBtn = $("#submit");
+let mine = [], sel = new Set(), writeVals = {}, last = null;
 try {
   const g = JSON.parse(localStorage.getItem("basted-guest") || "null");
   if (g) { me.value = g.name || ""; contact.value = g.phone || g.email || ""; }
@@ -88,71 +95,94 @@ try {
 
 function toast(msg) {
   const t = document.createElement("div"); t.className = "toast"; t.textContent = msg; document.body.appendChild(t);
-  setTimeout(() => t.remove(), 3200);
+  setTimeout(() => t.remove(), 3600);
 }
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 
-async function load() {
+async function load(force) {
+  // Don't redraw while someone is typing in a fill-in box.
+  if (!force && document.activeElement && document.activeElement.closest && document.activeElement.closest("#list")) return;
   try {
     const r = await fetch("/api/potluck", { cache: "no-store" });
     if (!r.ok) throw new Error();
-    render(await r.json());
+    last = await r.json(); render(last);
   } catch (e) { err.textContent = "Couldn’t load the list. Pull down to refresh."; }
 }
 
 function render(d) {
   $("#count").textContent = `${d.claimed} of ${d.total} claimed`;
+  const open = new Set(d.categories.flatMap((c) => c.items.filter((i) => !i.by).map((i) => i.item)));
+  for (const s of [...sel]) if (!open.has(s)) sel.delete(s);
   $("#list").innerHTML = d.categories.map((c) => `
     <div class="cat"><h3 class="label-caps">${esc(c.name)}</h3>
-      ${c.items.map((i) => `
-        <div class="item ${i.by && mine.includes(i.item) ? "mine" : ""}">
+      ${c.items.map((i) => i.by ? `
+        <div class="item ${mine.includes(i.item) ? "mine" : ""}">
           <span class="what">${esc(i.item)}</span>
-          ${i.by
-            ? `<span class="who"><svg aria-hidden="true"><use href="#check"/></svg>${esc(i.by)}</span>`
-            : `<button class="btn btn-primary claim" data-item="${esc(i.item)}" aria-label="Claim ${esc(i.item)}">Claim</button>`}
+          <span class="who"><svg aria-hidden="true"><use href="#check"/></svg>${esc(i.by)}</span>
+        </div>` : `
+        <div class="item ${sel.has(i.item) ? "selected" : ""}">
+          <span class="what">${esc(i.item)}</span>
+          <button type="button" class="pick" data-item="${esc(i.item)}" aria-pressed="${sel.has(i.item)}">${sel.has(i.item) ? "✓ Picked" : "Pick"}</button>
         </div>`).join("")}
+      ${c.extras.map((x) => `
+        <div class="item"><span class="what">${esc(x.dish)}</span>
+          <span class="who"><svg aria-hidden="true"><use href="#check"/></svg>${esc(x.name)}</span></div>`).join("")}
+      ${c.writeIn ? `
+        <div class="writein"><label for="w-${slug(c.name)}">Bringing something else? Type it here</label>
+          <input type="text" id="w-${slug(c.name)}" data-cat="${esc(c.name)}" maxlength="200" placeholder="Something else for ${esc(c.name.toLowerCase())}" value="${esc(writeVals[c.name] || "")}"></div>` : ""}
     </div>`).join("");
   $("#extras").innerHTML = d.extras.map((x) => `<li><span class="small">✦</span> <b>${esc(x.dish)}</b> <span class="muted">— ${esc(x.name)}</span></li>`).join("");
+  $("#other-h").classList.toggle("hidden", !d.extras.length);
+  updateSummary();
 }
 
-function remember() {
-  try {
-    const g = JSON.parse(localStorage.getItem("basted-guest") || "{}");
-    g.name = me.value.trim(); localStorage.setItem("basted-guest", JSON.stringify(g));
-  } catch (e) {}
+function updateSummary() {
+  const picks = [...sel, ...Object.values(writeVals).map((v) => v.trim()).filter(Boolean)];
+  $("#summary").textContent = picks.length ? `You’re bringing: ${picks.join(", ")}` : "Pick items above or type something in, then submit.";
 }
 
-$("#list").addEventListener("click", async (e) => {
-  const b = e.target.closest("button.claim"); if (!b) return;
+$("#list").addEventListener("click", (e) => {
+  const b = e.target.closest("button.pick"); if (!b) return;
+  const it = b.dataset.item;
+  sel.has(it) ? sel.delete(it) : sel.add(it);
+  const on = sel.has(it);
+  b.setAttribute("aria-pressed", on); b.textContent = on ? "✓ Picked" : "Pick";
+  b.closest(".item").classList.toggle("selected", on);
+  updateSummary();
+});
+$("#list").addEventListener("input", (e) => {
+  if (e.target.dataset.cat) { writeVals[e.target.dataset.cat] = e.target.value; updateSummary(); }
+});
+
+submitBtn.addEventListener("click", async () => {
   err.textContent = "";
-  if (!me.value.trim()) { err.textContent = "Add your name above first, then tap Claim."; me.focus(); return; }
-  b.disabled = true; b.textContent = "…";
+  const writeins = Object.entries(writeVals).map(([category, dish]) => ({ category, dish: dish.trim() })).filter((w) => w.dish);
+  const items = [...sel];
+  if (!me.value.trim()) { err.textContent = "Add your name at the top first."; me.focus(); me.scrollIntoView({ block: "center" }); return; }
+  if (!items.length && !writeins.length) { err.textContent = "Pick something or type it in first."; return; }
+  submitBtn.disabled = true; submitBtn.textContent = "Submitting…";
   try {
-    const r = await fetch("/api/claim", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ item: b.dataset.item, name: me.value, contact: contact.value }) });
+    const r = await fetch("/api/signup", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: me.value, contact: contact.value, items, writeins }) });
     const j = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(j.error || "Couldn’t claim that. Try again.");
-    mine.push(b.dataset.item); try { localStorage.setItem("basted-claims", JSON.stringify(mine)); } catch (e2) {}
-    remember();
-    toast(`Thanks! You’re bringing ${b.dataset.item}.`);
+    if (!r.ok) throw new Error(j.error || "Couldn’t submit. Please try again.");
+    mine.push(...j.claimed);
+    try {
+      localStorage.setItem("basted-claims", JSON.stringify(mine));
+      const g = JSON.parse(localStorage.getItem("basted-guest") || "{}"); g.name = me.value.trim(); localStorage.setItem("basted-guest", JSON.stringify(g));
+    } catch (e2) {}
+    sel.clear(); writeVals = {};
+    const got = [...j.claimed, ...j.added];
+    toast(`Thanks! You’re bringing ${got.join(", ")}.`);
+    if (j.taken && j.taken.length) err.textContent = `Heads up: someone already claimed ${j.taken.join(", ")}.`;
   } catch (e3) { err.textContent = e3.message; }
-  load();
+  submitBtn.disabled = false; submitBtn.textContent = "Submit my sign-up";
+  load(true);
 });
 
-$("#extra-form").addEventListener("submit", async (e) => {
-  e.preventDefault(); err.textContent = "";
-  const dish = $("#dish");
-  if (!me.value.trim()) { err.textContent = "Add your name above first."; me.focus(); return; }
-  if (!dish.value.trim()) { dish.focus(); return; }
-  const r = await fetch("/api/extra", { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: me.value, dish: dish.value }) });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok) { err.textContent = j.error || "Couldn’t add that. Try again."; return; }
-  remember(); toast(`Added: ${dish.value.trim()}`); dish.value = ""; load();
-});
-
-load();
-setInterval(() => { if (!document.hidden) load(); }, 20000);
+load(true);
+setInterval(() => { if (!document.hidden) load(false); }, 20000);
 </script>
 </body>
 </html>
