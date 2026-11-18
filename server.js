@@ -14,10 +14,12 @@ const POTLUCK = [
   ["Sides & Favorites", ["Mashed potatoes", "Mac & cheese", "Stuffing / dressing", "Sweet potato casserole", "Green bean casserole", "Vegetable side", "Salad", "Cranberry sauce", "Dinner rolls & butter"]],
   ["Desserts", ["Pumpkin pie", "Apple or pecan pie", "Cake / brownies / cookies", "Other dessert"]],
   ["Drinks", ["Wine to share", "Beer / seltzers to share", "Soda / juice", "Water", "Ice", "Kava", "Kratom", "Coffee"]],
-  ["Supplies & Extras", ["Folding chairs", "Plates & bowls", "Cups", "Napkins & utensils", "Serving utensils", "Take-home containers", "Coolers", "Trash bags", "Aluminum foil / plastic wrap", "Paper towels", "Chafing dishes / warming trays (with fuel)", "Tablecloths", "Bottle opener / wine opener", "Bug spray"]],
+  ["Supplies & Extras", ["Folding chairs", "Plates & bowls", "Cups", "Napkins & utensils", "Serving utensils", "Take-home containers", "Chafing dishes / warming trays (with fuel)", "Tablecloths", "Bottle opener / wine opener", "Bug spray"]],
 ];
 // Renamed items: old name -> new name (existing claims carry over).
 const RENAMES = { "Water / sparkling water": "Water", "Wine / cocktails": "Wine to share", "Beer / seltzers": "Beer / seltzers to share" };
+// Items taken off the list: any old claims or pledges for them are hidden everywhere.
+const REMOVED = new Set(["Trash bags", "Aluminum foil / plastic wrap", "Paper towels", "Coolers"]);
 const WRITE_IN = new Set(["Appetizers", "Sides & Favorites", "Desserts", "Drinks", "Supplies & Extras"]);
 const ALL_ITEMS = POTLUCK.flatMap(([, items]) => items);
 
@@ -31,7 +33,6 @@ const COUNTS = {
   "Ice": { unit: "bags", per: 5 },
   "Water": { unit: "cases", per: 10 },
   "Soda / juice": { unit: "packs or 2-liters", per: 8 },
-  "Coolers": { unit: "coolers", per: 8 },
   "Tablecloths": { unit: "tablecloths", per: 8 },
   "Chafing dishes / warming trays (with fuel)": { unit: "trays", per: 8 },
   "Serving utensils": { unit: "sets", per: 4 },
@@ -210,8 +211,11 @@ app.post("/api/rsvp", wrap(async (req, res) => {
   res.json({ ok: true, id, donation });
 }));
 
+const visible = ([claims, extras, ...rest]) => [
+  claims.filter((c) => !REMOVED.has(baseItem(c.item))), extras.filter((x) => !REMOVED.has(x.category)), ...rest];
+
 app.get("/api/potluck", wrap(async (_req, res) => {
-  const [claims, extras, rsvps] = await Promise.all([store.claims(), store.extras(), store.rsvps()]);
+  const [claims, extras, rsvps] = visible(await Promise.all([store.claims(), store.extras(), store.rsvps()]));
   const H = headcount(rsvps), spots = spotsFor(H);
   const byBase = {};
   for (const c of claims) (byBase[baseItem(c.item)] ||= []).push(c.name);
@@ -282,7 +286,7 @@ app.post("/api/extra", wrap(async (req, res) => {
 
 // Public "Who's coming" data. Never includes phone numbers, emails, contacts, donations or private RSVP notes.
 app.get("/api/public", wrap(async (_req, res) => {
-  const [rsvps, claims, extras, messages] = await Promise.all([store.rsvps(), store.allClaims(), store.extras(), store.messages()]);
+  const [claims, extras, rsvps, messages] = visible(await Promise.all([store.allClaims(), store.extras(), store.rsvps(), store.messages()]));
   const H = headcount(rsvps);
   const key = (n) => String(n || "").trim().toLowerCase();
   const people = new Map();
@@ -322,7 +326,7 @@ app.get("/api/admin", wrap(async (req, res) => {
   if (!isAdmin(req)) return res.status(401).json({ error: "Wrong host key." });
   const rsvps = await store.rsvps();
   const yes = rsvps.filter((r) => r.attending);
-  const [claims, extras, messages] = await Promise.all([store.allClaims(), store.extras(), store.messages()]);
+  const [claims, extras, messages] = visible(await Promise.all([store.allClaims(), store.extras(), store.messages()]));
   const H = headcount(rsvps), t = slotTotals(claims, H);
   res.json({
     rsvps, claims, extras, messages, headcount: H, claimedSlots: t.filled, totalItems: t.total,
