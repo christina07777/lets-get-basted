@@ -20,6 +20,7 @@
 </head>
 <body>
 <main class="page">
+  <nav class="site-nav top" aria-label="Party pages"></nav>
   <section class="card">
     <div class="center"><p class="eyebrow">Hosts only</p><h1 class="page-title">Party Dashboard</h1><p class="small"><a href="/whos-coming">Public “Who’s Coming” page →</a> · <a href="https://open.spotify.com/playlist/4Jliu98VSWwL240daEYfdh?si=YrcpM2NNQI-tC5Nm0pTx6A&amp;utm_source=copy-link&amp;pi=lNPE8MlIQRyb_&amp;pt=00809f64f69d12973f7eb3c48cab9ec9" target="_blank" rel="noopener">Party playlist →</a></p></div>
 
@@ -46,6 +47,7 @@
       <h2 class="label-caps">Comments</h2><div id="msgs"></div>
     </div>
   </section>
+  <nav class="site-nav bottom" aria-label="Party pages"></nav>
 </main>
 <script>
 const $ = (s) => document.querySelector(s);
@@ -122,5 +124,6 @@ $("#copy").addEventListener("click", async () => {
 });
 if (key) load();
 </script>
+<script src="/nav.js"></script>
 </body>
 </html>

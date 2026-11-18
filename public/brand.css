@@ -103,3 +103,15 @@ footer{text-align:center;margin-top:var(--space-6)}
 .playlist h2{margin:0;font:900 15px/1.2 var(--display);letter-spacing:.12em;text-transform:uppercase;color:var(--gold-500)}
 .playlist p{margin:4px 0 var(--space-3);font:600 14px/1.4 var(--display);color:var(--cream-200)}
 .playlist .btn{min-height:44px;padding:8px 18px;font-size:15px}
+
+/* Site navigation (top + bottom of every page) */
+.site-nav{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:8px;border-radius:var(--radius-pill);
+  background:rgba(42,8,17,.88);border:1.5px solid rgba(217,164,65,.6);box-shadow:var(--card)}
+.site-nav a{display:flex;align-items:center;justify-content:center;text-align:center;min-height:44px;padding:4px 6px;border-radius:var(--radius-pill);
+  font:800 14px/1.1 var(--display);color:var(--cream-100);text-decoration:none;border:1.5px solid rgba(217,164,65,.45)}
+.site-nav a[aria-current="page"]{background:linear-gradient(var(--parchment),var(--parchment-deep));color:var(--ink);border-color:var(--brass)}
+.site-nav a:hover{border-color:var(--gold-500)}
+.site-nav.top{position:sticky;top:8px;z-index:20;margin:0 0 var(--space-3);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.site-nav.bottom{margin:var(--space-6) 0 0}
+@media (max-width:360px){.site-nav a{font-size:12.5px}}
+.site-nav.top + .hero{margin-top:0}

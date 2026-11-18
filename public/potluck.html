@@ -73,6 +73,7 @@
   <symbol id="check" viewBox="0 0 16 16"><path d="M3 8.5l3 3 7-7" fill="none" stroke="#f7c548" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
 </svg>
 <main class="page">
+  <nav class="site-nav top" aria-label="Party pages"></nav>
   <div class="hero"><img src="/img/scene.jpg" width="1200" height="809" alt="Three turkeys at a Friendsgiving party: one passed out with an empty pie tin on its belly, one diva singing karaoke, one sneaking pie in the background."></div>
   <img class="lights" src="/img/lights.svg" alt="">
 
@@ -147,8 +148,8 @@
       <p>Help build the Friendsgiving soundtrack. Add the songs you want to hear (karaoke diva approved).</p>
       <a class="btn btn-secondary" href="https://open.spotify.com/playlist/4Jliu98VSWwL240daEYfdh?si=YrcpM2NNQI-tC5Nm0pTx6A&amp;utm_source=copy-link&amp;pi=lNPE8MlIQRyb_&amp;pt=00809f64f69d12973f7eb3c48cab9ec9" target="_blank" rel="noopener">Add songs on Spotify</a></div>
   </section>
-  <p class="center"><a class="btn btn-secondary" href="/whos-coming">See who’s coming →</a></p>
   <p class="center small">Haven’t RSVP’d yet? <a href="/">RSVP here</a> · or text Shannon <a href="sms:+17542441524">(754) 244-1524</a> • Christina <a href="sms:+19548542207">(954) 854-2207</a></p>
+  <nav class="site-nav bottom" aria-label="Party pages"></nav>
 </main>
 
 <script>
@@ -316,5 +317,6 @@ submitBtn.addEventListener("click", async () => {
 load(true);
 setInterval(() => { if (!document.hidden) load(false); }, 20000);
 </script>
+<script src="/nav.js"></script>
 </body>
 </html>
