@@ -13,9 +13,11 @@ const POTLUCK = [
   ["Main Dishes", ["Turkey", "Ham", "Gravy", "Vegetarian main dish"]],
   ["Sides & Favorites", ["Mashed potatoes", "Mac & cheese", "Stuffing / dressing", "Sweet potato casserole", "Green bean casserole", "Vegetable side", "Salad", "Cranberry sauce", "Dinner rolls & butter"]],
   ["Desserts", ["Pumpkin pie", "Apple or pecan pie", "Cake / brownies / cookies", "Other dessert"]],
-  ["Drinks", ["Wine / cocktails", "Beer / seltzers", "Soda / juice", "Water / sparkling water", "Ice", "Kava", "Kratom", "Coffee"]],
+  ["Drinks", ["Wine / cocktails", "Beer / seltzers", "Soda / juice", "Water", "Ice", "Kava", "Kratom", "Coffee"]],
   ["Supplies & Extras", ["Plates & bowls", "Cups", "Napkins & utensils", "Serving utensils", "Take-home containers", "Coolers", "Trash bags", "Aluminum foil / plastic wrap", "Paper towels", "Chafing dishes / warming trays (with fuel)", "Tablecloths", "Bottle opener / wine opener", "Bug spray"]],
 ];
+// Renamed items: old name -> new name (existing claims carry over).
+const RENAMES = { "Water / sparkling water": "Water" };
 const WRITE_IN = new Set(["Appetizers", "Sides & Favorites", "Desserts", "Drinks", "Supplies & Extras"]);
 const ALL_ITEMS = POTLUCK.flatMap(([, items]) => items);
 
@@ -46,6 +48,8 @@ function makeStore() {
           created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
         await q(`ALTER TABLE extras ADD COLUMN IF NOT EXISTS category TEXT`);
         await q(`ALTER TABLE extras ADD COLUMN IF NOT EXISTS contact TEXT`);
+        for (const [from, to] of Object.entries(RENAMES))
+          await q(`UPDATE claims SET item=$2 WHERE item=$1 AND NOT EXISTS (SELECT 1 FROM claims WHERE item=$2)`, [from, to]);
       },
       async addRsvp(r) {
         const { rows } = await q(
@@ -75,7 +79,10 @@ function makeStore() {
   const save = () => fs.writeFileSync(file, JSON.stringify(data, null, 1));
   const now = () => new Date().toISOString();
   return {
-    async init() { if (fs.existsSync(file)) data = JSON.parse(fs.readFileSync(file, "utf8")); },
+    async init() {
+      if (fs.existsSync(file)) data = JSON.parse(fs.readFileSync(file, "utf8"));
+      data.claims.forEach((c) => { if (RENAMES[c.item]) c.item = RENAMES[c.item]; });
+    },
     async addRsvp(r) { const id = data.seq++; data.rsvps.push({ id, ...r, created_at: now() }); save(); return id; },
     async claims() { return data.claims.map(({ item, name, created_at }) => ({ item, name, created_at })); },
     async claim(item, name, contact) {
