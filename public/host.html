@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500..900&family=Playfair+Display:ital,wght@1,700&display=swap">
 <link rel="stylesheet" href="/brand.css">
 <style>
-  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-2);margin:var(--space-4) 0}
+  .stats{display:grid;grid-template-columns:repeat(2,1fr);gap:var(--space-2);margin:var(--space-4) 0}
   .stat{background:var(--cranberry-800);border-radius:var(--radius-md);padding:12px 8px;text-align:center}
   .stat b{display:block;font:900 28px/1 var(--display);color:var(--gold-500)}
   .entry{background:rgba(92,22,40,.55);border-radius:var(--radius-md);padding:12px 14px;margin-bottom:8px;text-align:left}
@@ -34,11 +34,13 @@
         <div class="stat"><b id="s-guests">0</b><span class="small">guests coming</span></div>
         <div class="stat"><b id="s-items">0</b><span class="small">dishes claimed</span></div>
         <div class="stat"><b id="s-chairs">0</b><span class="small">chairs pledged</span></div>
+        <div class="stat"><b id="s-don">$0</b><span class="small">donations pledged</span></div>
       </div>
       <button class="btn btn-secondary btn-block" id="copy">Copy everything as text</button>
 
       <h2 class="label-caps">RSVPs</h2><div id="rsvps"></div>
       <h2 class="label-caps">Potluck claims</h2><div id="claims"></div>
+      <h2 class="label-caps">Donations (private)</h2><div id="dons"></div>
       <h2 class="label-caps">Folding chairs</h2><div id="chairs"></div>
       <h2 class="label-caps">Fill-in items</h2><div id="extras"></div>
       <h2 class="label-caps">Comments</h2><div id="msgs"></div>
@@ -78,10 +80,13 @@ function render() {
       <button class="x" data-del-rsvp="${r.id}">Remove</button></div></div>`).join("") || `<p class="small">No RSVPs yet.</p>`;
   $("#claims").innerHTML = data.claims.map((c) => `<div class="entry"><div class="top"><div><b>${esc(c.item)}</b> — ${esc(c.name)}
       ${c.contact ? `<p class="small">${esc(c.contact)}</p>` : ""}</div><button class="x" data-unclaim="${esc(c.item)}">Release</button></div></div>`).join("") || `<p class="small">Nothing claimed yet.</p>`;
+  $("#s-don").textContent = `$${data.donations || 0}`;
+  $("#dons").innerHTML = data.extras.filter((x) => x.category === "Donation").map((x) => `<div class="entry"><div class="top"><div><b>$${esc(x.dish)}</b> — ${esc(x.name)}${x.contact ? `<p class="small">${esc(x.contact)}</p>` : ""}</div>
+      <button class="x" data-del-extra="${x.id}">Remove</button></div></div>`).join("") || `<p class="small">No donations pledged yet.</p>`;
   const chairRows = data.extras.filter((x) => x.category === "Folding chairs");
   $("#chairs").innerHTML = chairRows.map((x) => `<div class="entry"><div class="top"><div><b>${esc(x.dish)} chair(s)</b> — ${esc(x.name)}${x.contact ? `<p class="small">${esc(x.contact)}</p>` : ""}</div>
       <button class="x" data-del-extra="${x.id}">Remove</button></div></div>`).join("") || `<p class="small">No chairs pledged yet.</p>`;
-  $("#extras").innerHTML = data.extras.filter((x) => x.category !== "Folding chairs").map((x) => `<div class="entry"><div class="top"><div><b>${x.category === "Folding chairs" ? `${esc(x.dish)} folding chair(s)` : esc(x.dish)}</b> — ${esc(x.name)}${x.category ? `<p class="small">${esc(x.category)}${x.contact ? ` · ${esc(x.contact)}` : ""}</p>` : ""}</div>
+  $("#extras").innerHTML = data.extras.filter((x) => x.category !== "Folding chairs" && x.category !== "Donation").map((x) => `<div class="entry"><div class="top"><div><b>${x.category === "Folding chairs" ? `${esc(x.dish)} folding chair(s)` : esc(x.dish)}</b> — ${esc(x.name)}${x.category ? `<p class="small">${esc(x.category)}${x.contact ? ` · ${esc(x.contact)}` : ""}</p>` : ""}</div>
       <button class="x" data-del-extra="${x.id}">Remove</button></div></div>`).join("") || `<p class="small">None yet.</p>`;
 }
 $("#login").addEventListener("submit", (e) => { e.preventDefault(); key = $("#key").value.trim(); load(); });
@@ -108,7 +113,8 @@ $("#copy").addEventListener("click", async () => {
   data.rsvps.forEach((r) => L.push(`- ${r.name}: ${r.attending ? `coming (${r.party_size || "?"})` : "can’t make it"}${r.guest_names ? ` — ${r.guest_names}` : ""}${r.phone ? ` · ${r.phone}` : ""}${r.email ? ` · ${r.email}` : ""}${r.notes ? ` · Note: ${r.notes}` : ""}`));
   L.push("", "Folding chairs:"); data.extras.filter((x) => x.category === "Folding chairs").forEach((x) => L.push(`- ${x.name}: ${x.dish}`));
   L.push("", "Potluck:"); data.claims.forEach((c) => L.push(`- ${c.item} — ${c.name}`));
-  const fill = data.extras.filter((x) => x.category !== "Folding chairs");
+  const fill = data.extras.filter((x) => x.category !== "Folding chairs" && x.category !== "Donation");
+  L.push("", `Donations pledged: $${data.donations || 0}`); data.extras.filter((x) => x.category === "Donation").forEach((x) => L.push(`- ${x.name}: $${x.dish}${x.contact ? ` (${x.contact})` : ""}`));
   if (fill.length) { L.push("", "Extras:"); fill.forEach((x) => L.push(x.category === "Folding chairs" ? `- ${x.dish} folding chair(s) — ${x.name}` : `- ${x.dish} — ${x.name}${x.category ? ` (${x.category})` : ""}`)); }
   try { await navigator.clipboard.writeText(L.join("\n")); $("#copy").textContent = "Copied!"; } catch (e) { $("#copy").textContent = "Couldn’t copy"; }
   setTimeout(() => ($("#copy").textContent = "Copy everything as text"), 2500);

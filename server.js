@@ -23,6 +23,9 @@ const ALL_ITEMS = POTLUCK.flatMap(([, items]) => items);
 // Folding chairs: many people can pledge, each with a count. Shown at the top of Supplies & Extras.
 const CHAIRS = "Folding chairs";
 const CHAIRS_CATEGORY = "Supplies & Extras";
+// Donations are private: stored with the extras but never shown on public pages.
+const DONATION = "Donation";
+const CASHTAGS = ["christinalarie", "ShannonMoceri"];
 const CHAIRS_NOTE = "We need folding chairs for two spots: around the tables for dinner AND out on the lawn for hanging out. Bring as many as you can!";
 
 // ---------- storage ----------
@@ -174,7 +177,7 @@ app.get("/api/potluck", wrap(async (_req, res) => {
       extras: extras.filter((x) => x.category === name).map(({ name: n, dish }) => ({ name: n, dish })),
       chairs: name === CHAIRS_CATEGORY ? chairInfo(extras) : undefined,
     })),
-    extras: extras.filter((x) => !WRITE_IN.has(x.category) && x.category !== CHAIRS).map(({ name, dish }) => ({ name, dish })),
+    extras: extras.filter((x) => !WRITE_IN.has(x.category) && x.category !== CHAIRS && x.category !== DONATION).map(({ name, dish }) => ({ name, dish })),
   });
 }));
 
@@ -201,15 +204,18 @@ app.post("/api/signup", wrap(async (req, res) => {
   const excited = clean(req.body?.excited, 500);
   const thankful = clean(req.body?.thankful, 500);
   const hasMsg = !!(excited || thankful);
+  const donation = Math.min(int(req.body?.donation), 1000);
+  const payTo = CASHTAGS.includes(req.body?.payTo) ? req.body.payTo : "";
   if (!name) return res.status(400).json({ error: "Please add your name." });
-  if (!items.length && !writeins.length && !chairs && !hasMsg) return res.status(400).json({ error: "Pick an item or type one in first." });
+  if (!items.length && !writeins.length && !chairs && !hasMsg && !donation) return res.status(400).json({ error: "Pick an item or type one in first." });
   const claimed = [], taken = [];
   for (const item of items) ((await store.claim(item, name, contact)) ? claimed : taken).push(item);
   for (const w of writeins) await store.addExtra(name, w.dish, w.category, contact);
   if (chairs) await setChairs(name, chairs, contact);
   if (hasMsg) await store.setMessage(name, excited, thankful);
-  if (!claimed.length && !writeins.length && !chairs && !hasMsg) return res.status(409).json({ error: `Someone just claimed ${taken.join(", ")}. Pick something else?`, taken });
-  res.json({ ok: true, claimed, taken, message: hasMsg, added: [...writeins.map((w) => w.dish), ...(chairs ? [`${chairs} folding chair${chairs > 1 ? "s" : ""}`] : [])] });
+  if (donation) await store.addExtra(name, String(donation), DONATION, [contact, payTo && `to $${payTo}`].filter(Boolean).join(" · "));
+  if (!claimed.length && !writeins.length && !chairs && !hasMsg && !donation) return res.status(409).json({ error: `Someone just claimed ${taken.join(", ")}. Pick something else?`, taken });
+  res.json({ ok: true, claimed, taken, message: hasMsg, donation, added: [...writeins.map((w) => w.dish), ...(chairs ? [`${chairs} folding chair${chairs > 1 ? "s" : ""}`] : [])] });
 }));
 
 app.post("/api/extra", wrap(async (req, res) => {
@@ -237,6 +243,7 @@ app.get("/api/public", wrap(async (_req, res) => {
   for (const c of claims) { const p = person(c.name); if (p) p.bringing.push(c.item); }
   for (const x of extras) {
     const p = person(x.name); if (!p) continue;
+    if (x.category === DONATION) continue; // private
     if (x.category === CHAIRS) p.chairs += int(x.dish); else p.bringing.push(x.dish);
   }
   for (const m of messages) { const p = person(m.name); if (p) { p.excited = m.excited || ""; p.thankful = m.thankful || ""; } }
@@ -261,6 +268,7 @@ app.get("/api/admin", wrap(async (req, res) => {
     rsvps, claims: await store.allClaims(), extras: await store.extras(), messages: await store.messages(), totalItems: ALL_ITEMS.length,
     guests: yes.reduce((n, r) => n + (r.party_size || 0), 0),
     chairs: chairInfo(await store.extras()).total,
+    donations: (await store.extras()).filter((x) => x.category === DONATION).reduce((n, x) => n + int(x.dish), 0),
   });
 }));
 app.delete("/api/admin/claim", wrap(async (req, res) => {

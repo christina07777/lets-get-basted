@@ -25,6 +25,15 @@
     font-family:var(--display);font-weight:700;border:1.5px solid rgba(217,164,65,.7);background:transparent;color:var(--cream-100)}
   .pick[aria-pressed="true"]{background:linear-gradient(var(--parchment),var(--parchment-deep));color:var(--ink);border-color:var(--brass)}
   .item.selected{outline:1.5px solid var(--gold-500)}
+  .chipin{text-align:left}
+  .amounts{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--space-2)}
+  .amt{min-height:46px;border-radius:var(--radius-pill);border:1.5px solid rgba(217,164,65,.7);background:transparent;color:var(--cream-100);
+    font:800 16px var(--display);cursor:pointer}
+  .amt[aria-pressed="true"]{background:linear-gradient(var(--parchment),var(--parchment-deep));color:var(--ink);border-color:var(--brass)}
+  #amt-other{text-align:center;padding:10px 6px;border-radius:var(--radius-pill)}
+  .cashapp{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2)}
+  .cash{font-size:15px;padding:10px 8px;min-height:46px}
+  @media (max-width:380px){.cashapp{grid-template-columns:1fr}}
   .item.chairs{align-items:flex-start;padding:12px}
   .chair-note{margin:6px 0 0;font:600 14px/1.4 var(--display);color:var(--cream-200)}
   .chair-who{margin:6px 0 0;font:700 13px/1.4 var(--display);color:var(--gold-500)}
@@ -79,6 +88,24 @@
     <ul class="extras" id="extras"></ul>
 
     <div class="divider"><svg aria-hidden="true"><use href="#spark"/></svg></div>
+    <section class="chipin" aria-labelledby="chip-h">
+      <h3 class="label-caps" id="chip-h" style="margin:0">Chip in <span class="muted" style="letter-spacing:.04em;text-transform:none;font-weight:600">(totally optional)</span></h3>
+      <p class="small" style="margin:var(--space-2) 0 var(--space-3)">Hosting a party this size adds up, so we may need a little extra to cover costs. If you’d like to pitch in, instead of a dish or on top of one, we’d be so grateful. <b>It’s never required</b>, just come hungry!</p>
+      <div class="amounts" role="group" aria-label="Donation amount">
+        <button type="button" class="amt" data-amt="10" aria-pressed="false">$10</button>
+        <button type="button" class="amt" data-amt="20" aria-pressed="false">$20</button>
+        <button type="button" class="amt" data-amt="30" aria-pressed="false">$30</button>
+        <input type="number" id="amt-other" inputmode="numeric" min="1" max="1000" placeholder="Other" aria-label="Other amount">
+      </div>
+      <p class="small" style="margin:var(--space-3) 0 var(--space-2)">Send it on Cash App to either host:</p>
+      <div class="cashapp">
+        <a class="btn btn-secondary cash" data-tag="christinalarie" href="https://cash.app/$christinalarie" target="_blank" rel="noopener">$christinalarie</a>
+        <a class="btn btn-secondary cash" data-tag="ShannonMoceri" href="https://cash.app/$ShannonMoceri" target="_blank" rel="noopener">$ShannonMoceri</a>
+      </div>
+      <p class="small" style="margin:var(--space-2) 0 0">Then hit <b>Submit</b> below so we can say thank you. Only the hosts see donations.</p>
+    </section>
+
+    <div class="divider"><svg aria-hidden="true"><use href="#spark"/></svg></div>
     <div class="center">
       <button type="button" class="btn btn-secondary" id="toggle-comment" aria-expanded="false" aria-controls="comment-box">Add a comment</button>
       <p class="small" style="margin:var(--space-2) 0 0">Your comment shows on the <a href="/whos-coming">Who’s Coming</a> page.</p>
@@ -105,7 +132,7 @@
 <script>
 const $ = (s) => document.querySelector(s);
 const me = $("#me"), contact = $("#contact"), err = $("#err"), submitBtn = $("#submit");
-let mine = [], sel = new Set(), writeVals = {}, chairQty = 0, last = null;
+let mine = [], sel = new Set(), writeVals = {}, chairQty = 0, donation = 0, payTo = "", last = null;
 try {
   const g = JSON.parse(localStorage.getItem("basted-guest") || "null");
   if (g) { me.value = g.name || ""; contact.value = g.phone || g.email || ""; }
@@ -167,8 +194,8 @@ function render(d) {
 
 function updateSummary() {
   const picks = [...sel, ...Object.values(writeVals).map((v) => v.trim()).filter(Boolean), ...(chairQty ? [`${chairQty} folding chair${chairQty > 1 ? "s" : ""}`] : [])];
-  const msg = ($("#excited").value.trim() || $("#thankful").value.trim()) ? "a comment" : "";
-  $("#summary").textContent = picks.length ? `You’re bringing: ${picks.join(", ")}${msg ? " + " + msg : ""}` : msg ? "Ready to post your comment." : "Pick items above or type something in, then submit.";
+  const extra = [($("#excited").value.trim() || $("#thankful").value.trim()) ? "a comment" : "", donation ? `a $${donation} donation` : ""].filter(Boolean).join(" + ");
+  $("#summary").textContent = picks.length ? `You’re bringing: ${picks.join(", ")}${extra ? " + " + extra : ""}` : extra ? `Ready to submit ${extra}.` : "Pick items above or type something in, then submit.";
 }
 
 $("#list").addEventListener("click", (e) => {
@@ -186,6 +213,20 @@ $("#toggle-comment").addEventListener("click", (e) => {
   if (open) $("#excited").focus();
 });
 $("#comment-box").addEventListener("input", updateSummary);
+
+// Chip in
+function setAmount(v) {
+  donation = Math.max(0, Math.min(1000, parseInt(v, 10) || 0));
+  document.querySelectorAll(".amt").forEach((b) => b.setAttribute("aria-pressed", String(+b.dataset.amt === donation && !$("#amt-other").value)));
+  document.querySelectorAll(".cash").forEach((a) => { a.href = `https://cash.app/$${a.dataset.tag}${donation ? "/" + donation : ""}`; });
+  updateSummary();
+}
+document.querySelectorAll(".amt").forEach((b) => b.addEventListener("click", () => {
+  $("#amt-other").value = "";
+  setAmount(+b.dataset.amt === donation ? 0 : b.dataset.amt);
+}));
+$("#amt-other").addEventListener("input", (e) => setAmount(e.target.value));
+document.querySelectorAll(".cash").forEach((a) => a.addEventListener("click", () => { payTo = a.dataset.tag; }));
 $("#list").addEventListener("input", (e) => {
   if (e.target.id === "chair-qty") {
     chairQty = Math.max(0, Math.min(50, parseInt(e.target.value, 10) || 0));
@@ -200,11 +241,11 @@ submitBtn.addEventListener("click", async () => {
   const items = [...sel];
   if (!me.value.trim()) { err.textContent = "Add your name at the top first."; me.focus(); me.scrollIntoView({ block: "center" }); return; }
   const excited = $("#excited").value.trim(), thankful = $("#thankful").value.trim();
-  if (!items.length && !writeins.length && !chairQty && !excited && !thankful) { err.textContent = "Pick something, type it in, or add a comment first."; return; }
+  if (!items.length && !writeins.length && !chairQty && !excited && !thankful && !donation) { err.textContent = "Pick something, type it in, or add a comment first."; return; }
   submitBtn.disabled = true; submitBtn.textContent = "Submitting…";
   try {
     const r = await fetch("/api/signup", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: me.value, contact: contact.value, items, writeins, chairs: chairQty, excited, thankful }) });
+      body: JSON.stringify({ name: me.value, contact: contact.value, items, writeins, chairs: chairQty, excited, thankful, donation, payTo }) });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.error || "Couldn’t submit. Please try again.");
     mine.push(...j.claimed);
@@ -215,7 +256,9 @@ submitBtn.addEventListener("click", async () => {
     sel.clear(); writeVals = {}; chairQty = 0;
     const got = [...j.claimed, ...j.added];
     if (j.message) { $("#excited").value = ""; $("#thankful").value = ""; }
-    toast(got.length ? `Thanks! You’re bringing ${got.join(", ")}.${j.message ? " Comment posted!" : ""}` : "Thanks! Your comment is posted.");
+    const thanks = [j.message ? "Comment posted!" : "", j.donation ? "Thank you for chipping in!" : ""].filter(Boolean).join(" ");
+    toast(got.length ? `Thanks! You’re bringing ${got.join(", ")}. ${thanks}` : thanks || "Thanks!");
+    if (j.donation) { $("#amt-other").value = ""; payTo = ""; setAmount(0); }
     if (j.taken && j.taken.length) err.textContent = `Heads up: someone already claimed ${j.taken.join(", ")}.`;
   } catch (e3) { err.textContent = e3.message; }
   submitBtn.disabled = false; submitBtn.textContent = "Submit my sign-up";
