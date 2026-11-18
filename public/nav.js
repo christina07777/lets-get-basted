@@ -3,7 +3,7 @@
   var here = location.pathname.replace(/\.html$/, "").replace(/\/$/, "") || "/";
   var links = [
     ["/", "RSVP"],
-    ["/potluck", "Sign Up"],
+    ["/potluck", "What to Bring"],
     ["/whos-coming", "Who\u2019s Coming"],
     ["https://open.spotify.com/playlist/4Jliu98VSWwL240daEYfdh?si=YrcpM2NNQI-tC5Nm0pTx6A&utm_source=copy-link&pi=lNPE8MlIQRyb_&pt=00809f64f69d12973f7eb3c48cab9ec9", "Playlist", true]
   ];
