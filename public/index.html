@@ -17,6 +17,15 @@
   .save{display:block;text-align:center;margin:-4px 0 var(--space-6)}
   .texts{margin-top:var(--space-4)}
   .texts a{color:var(--cream-100);text-decoration:none;border-bottom:1px solid rgba(217,164,65,.6)}
+  .chipin{text-align:left;margin:var(--space-2) 0 var(--space-6);padding:var(--space-4);border-radius:var(--radius-md);background:rgba(92,22,40,.55)}
+  .amounts{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--space-2)}
+  .amt{min-height:46px;border-radius:var(--radius-pill);border:1.5px solid rgba(217,164,65,.7);background:transparent;color:var(--cream-100);
+    font:800 16px var(--display);cursor:pointer}
+  .amt[aria-pressed="true"]{background:linear-gradient(var(--parchment),var(--parchment-deep));color:var(--ink);border-color:var(--brass)}
+  #amt-other{text-align:center;padding:10px 2px;font-size:15px;border-radius:var(--radius-pill)}
+  .cashapp{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2)}
+  .cash{font-size:15px;padding:10px 8px;min-height:46px}
+  @media (max-width:380px){.cashapp{grid-template-columns:1fr}}
   .confirm .check{width:56px;height:56px;margin:0 auto var(--space-3);display:block}
 </style>
 </head>
@@ -67,6 +76,23 @@
         <div class="field"><label for="notes">Anything we should know? <span class="hint">(dietary needs, allergies…)</span></label>
           <textarea id="notes" name="notes" placeholder="Optional"></textarea></div>
 
+        <section class="chipin" aria-labelledby="chip-h">
+          <h3 class="label-caps" id="chip-h" style="margin:0">Chip in <span class="muted" style="letter-spacing:.04em;text-transform:none;font-weight:600">(totally optional)</span></h3>
+          <p class="small" style="margin:var(--space-2) 0 var(--space-3)">Hosting a party this size adds up, so we may need a little extra to cover costs. If you’d like to pitch in, we’d be so grateful. <b>It’s never required</b>, just come hungry!</p>
+          <div class="amounts" role="group" aria-label="Donation amount">
+            <button type="button" class="amt" data-amt="10" aria-pressed="false">$10</button>
+            <button type="button" class="amt" data-amt="20" aria-pressed="false">$20</button>
+            <button type="button" class="amt" data-amt="30" aria-pressed="false">$30</button>
+            <input type="number" id="amt-other" inputmode="numeric" min="1" max="1000" placeholder="Other" aria-label="Other amount">
+          </div>
+          <p class="small" style="margin:var(--space-3) 0 var(--space-2)">Send it on Cash App to either host:</p>
+          <div class="cashapp">
+            <a class="btn btn-secondary cash" data-tag="christinalarie" href="https://cash.app/$christinalarie" target="_blank" rel="noopener">$christinalarie</a>
+            <a class="btn btn-secondary cash" data-tag="ShannonMoceri" href="https://cash.app/$ShannonMoceri" target="_blank" rel="noopener">$ShannonMoceri</a>
+          </div>
+          <p class="small" style="margin:var(--space-2) 0 0">Your RSVP below records it so we can say thank you. Only the hosts see donations.</p>
+        </section>
+
         <button class="btn btn-primary btn-block" type="submit" id="send">Send my RSVP</button>
         <p class="error" id="err" role="alert"></p>
       </form>
@@ -91,6 +117,17 @@ const err = document.getElementById("err");
 const send = document.getElementById("send");
 const yesOnly = document.querySelector(".yes-only");
 
+let donation = 0, payTo = "";
+const $q = (s) => document.querySelector(s);
+function setAmount(v) {
+  donation = Math.max(0, Math.min(1000, parseInt(v, 10) || 0));
+  document.querySelectorAll(".amt").forEach((b) => b.setAttribute("aria-pressed", String(+b.dataset.amt === donation && !$q("#amt-other").value)));
+  document.querySelectorAll(".cash").forEach((a) => { a.href = `https://cash.app/$${a.dataset.tag}${donation ? "/" + donation : ""}`; });
+}
+document.querySelectorAll(".amt").forEach((b) => b.addEventListener("click", () => { $q("#amt-other").value = ""; setAmount(+b.dataset.amt === donation ? 0 : b.dataset.amt); }));
+$q("#amt-other").addEventListener("input", (e) => setAmount(e.target.value));
+document.querySelectorAll(".cash").forEach((a) => a.addEventListener("click", () => { payTo = a.dataset.tag; }));
+
 function attending() { return form.attending.value !== "no"; }
 form.addEventListener("change", () => yesOnly.classList.toggle("hidden", !attending()));
 
@@ -106,7 +143,7 @@ form.addEventListener("submit", async (e) => {
   const body = {
     name: form.name.value, email: form.email.value, phone: form.phone.value,
     attending: attending(), party_size: form.party_size.value, guest_names: form.guest_names.value,
-    chairs: form.chairs.value, notes: form.notes.value,
+    chairs: form.chairs.value, notes: form.notes.value, donation, payTo,
   };
   if (!body.name.trim()) { err.textContent = "Please add your name."; form.name.focus(); return; }
   send.disabled = true; send.textContent = "Sending…";
@@ -122,6 +159,7 @@ form.addEventListener("submit", async (e) => {
       document.getElementById("done-text").textContent = "Thanks for letting us know. Save us a slice next year.";
       document.getElementById("to-potluck").classList.add("hidden");
     }
+    if (donation) document.getElementById("done-text").textContent += ` Thank you for chipping in $${donation}!`;
     done.classList.remove("hidden");
     document.getElementById("rsvp-card").scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (e2) {

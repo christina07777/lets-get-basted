@@ -150,7 +150,10 @@ app.post("/api/rsvp", wrap(async (req, res) => {
   const id = await store.addRsvp(r);
   // Chairs from the RSVP go into the same pledge list the potluck page and dashboard use.
   if (r.attending && r.chairs) await setChairs(r.name, Math.min(r.chairs, 50), r.phone || r.email);
-  res.json({ ok: true, id });
+  const donation = Math.min(int(b.donation), 1000);
+  const payTo = CASHTAGS.includes(b.payTo) ? b.payTo : "";
+  if (donation) await store.addExtra(r.name, String(donation), DONATION, [r.phone || r.email, payTo && `to $${payTo}`].filter(Boolean).join(" · "));
+  res.json({ ok: true, id, donation });
 }));
 
 // One chair pledge per person (by name): a new number replaces their old one, so nothing is double-counted.
