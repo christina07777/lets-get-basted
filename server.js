@@ -14,7 +14,7 @@ const POTLUCK = [
   ["Sides & Favorites", ["Mashed potatoes", "Mac & cheese", "Stuffing / dressing", "Sweet potato casserole", "Green bean casserole", "Vegetable side", "Salad", "Cranberry sauce", "Dinner rolls & butter"]],
   ["Desserts", ["Pumpkin pie", "Apple or pecan pie", "Cake / brownies / cookies", "Other dessert"]],
   ["Drinks", ["Wine / cocktails", "Beer / seltzers", "Soda / juice", "Water / sparkling water", "Ice"]],
-  ["Supplies & Extras", ["Plates & bowls", "Cups", "Napkins & utensils", "Serving utensils", "Take-home containers"]],
+  ["Supplies & Extras", ["Plates & bowls", "Cups", "Napkins & utensils", "Serving utensils", "Take-home containers", "Coolers", "Trash bags", "Aluminum foil / plastic wrap", "Paper towels", "Chafing dishes / warming trays (with fuel)", "Tablecloths", "Bottle opener / wine opener", "Bug spray"]],
 ];
 const WRITE_IN = new Set(["Appetizers", "Sides & Favorites", "Desserts", "Drinks", "Supplies & Extras"]);
 const ALL_ITEMS = POTLUCK.flatMap(([, items]) => items);
