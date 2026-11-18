@@ -115,3 +115,42 @@ footer{text-align:center;margin-top:var(--space-6)}
 .site-nav.bottom{margin:var(--space-6) 0 0}
 @media (max-width:360px){.site-nav a{font-size:12.5px}}
 .site-nav.top + .hero{margin-top:0}
+
+/* Chip in (donations) */
+.donate-card{position:relative;text-align:left;padding:var(--space-6) var(--space-4) var(--space-4);border-radius:var(--radius-lg);
+  background:linear-gradient(180deg,rgba(247,197,72,.10),rgba(92,22,40,.55) 40%);border:2px solid var(--gold-500);
+  box-shadow:0 0 22px rgba(255,179,71,.22),var(--card)}
+.donate-head{display:flex;gap:var(--space-3);align-items:flex-start}
+.donate-head .gift,.donate-thanks .gift{width:40px;height:40px;flex:none;fill:var(--gold-500);filter:drop-shadow(0 0 8px rgba(255,179,71,.5))}
+.donate-head h3{margin:0;font:900 19px/1.2 var(--display);letter-spacing:.1em;text-transform:uppercase;
+  background:linear-gradient(var(--gold-200),var(--gold-500) 45%,var(--gold-700));-webkit-background-clip:text;background-clip:text;color:transparent}
+.donate-head h3 span{font:600 13px var(--display);letter-spacing:0;text-transform:none;-webkit-text-fill-color:var(--cream-200)}
+.donate-head p{margin:6px 0 var(--space-4);font:600 14px/1.45 var(--display);color:var(--cream-100)}
+.donate-card .amounts{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--space-2)}
+.donate-card .amt{min-height:48px;border-radius:var(--radius-pill);border:1.5px solid rgba(217,164,65,.8);background:transparent;color:var(--cream-100);font:800 17px var(--display);cursor:pointer}
+.donate-card .amt[aria-pressed="true"]{background:linear-gradient(var(--parchment),var(--parchment-deep));color:var(--ink);border-color:var(--brass)}
+.donate-card .amt-other{text-align:center;padding:10px 2px;font-size:15px;border-radius:var(--radius-pill);min-height:48px}
+.pay-label{margin:var(--space-4) 0 6px;font:900 12px/1.2 var(--display);letter-spacing:.12em;text-transform:uppercase;color:var(--gold-500)}
+.pay-label span{font:600 12px var(--display);letter-spacing:0;text-transform:none;color:var(--cream-200)}
+.pay-row{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2)}
+.donate-card .pay{min-height:48px;padding:8px 6px;font-size:15px;flex-direction:column;gap:0;line-height:1.15}
+.donate-card .pay small{font:600 12px var(--display);color:var(--cream-200)}
+.donate-card .pay.chosen{border-color:var(--gold-500);background:rgba(247,197,72,.12)}
+.pay-foot{margin:var(--space-3) 0 0;font:600 13px/1.4 var(--display);color:var(--cream-200)}
+.donate-who{margin-top:var(--space-4)}
+.donate-card .d-sent{margin-top:var(--space-3)}
+.donate-thanks{text-align:center;padding:var(--space-4) 0}
+.donate-thanks h3{margin:var(--space-2) 0 0;font:900 22px var(--display);color:var(--gold-500)}
+.donate-thanks p{margin:6px 0 0;color:var(--cream-100)}
+@media (max-width:360px){.pay-row{grid-template-columns:1fr}}
+
+/* Pop-up */
+.donate-modal{position:fixed;inset:0;z-index:50;display:flex;align-items:flex-end;justify-content:center;padding:12px;
+  background:rgba(20,4,8,.72);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);animation:dm-in .2s ease-out}
+.donate-dialog{width:100%;max-width:520px;max-height:92vh;overflow:auto;padding:var(--space-4);border-radius:var(--radius-lg);background:var(--cranberry-900);
+  border:1.5px solid rgba(217,164,65,.6);box-shadow:var(--card);text-align:center}
+.dm-kicker{margin:0 0 var(--space-3);font:italic 700 20px/1.25 var(--accent);color:var(--coral)}
+.dm-later{margin-top:var(--space-2)}
+@media (min-width:600px){.donate-modal{align-items:center}}
+@keyframes dm-in{from{opacity:0}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){.donate-modal{animation:none}}

@@ -44,7 +44,9 @@ const MULTI_PER = 15;
 const CLAIMABLE = ALL_ITEMS.filter((i) => !COUNTS[i]);
 // Donations are private: stored with the extras but never shown on public pages.
 const DONATION = "Donation";
-const CASHTAGS = ["christinalarie", "ShannonMoceri"];
+const PAY_TO = { christinalarie: "Cash App $christinalarie", ShannonMoceri: "Cash App $ShannonMoceri",
+  "zelle-christina": "Zelle Christina", "zelle-shannon": "Zelle Shannon" };
+const payLabel = (contact, payTo) => [contact, PAY_TO[payTo] && `via ${PAY_TO[payTo]}`].filter(Boolean).join(" · ");
 
 // ---------- storage ----------
 const clean = (v, max = 200) => (typeof v === "string" ? v.trim().slice(0, max) : "");
@@ -206,8 +208,7 @@ app.post("/api/rsvp", wrap(async (req, res) => {
   // Chairs from the RSVP go into the same pledge list the potluck page and dashboard use.
   if (r.attending && r.chairs) await setCount(r.name, CHAIRS, Math.min(r.chairs, 50), r.phone || r.email);
   const donation = Math.min(int(b.donation), 1000);
-  const payTo = CASHTAGS.includes(b.payTo) ? b.payTo : "";
-  if (donation) await store.addExtra(r.name, String(donation), DONATION, [r.phone || r.email, payTo && `to $${payTo}`].filter(Boolean).join(" · "));
+  if (donation) await store.addExtra(r.name, String(donation), DONATION, payLabel(r.phone || r.email, b.payTo));
   res.json({ ok: true, id, donation });
 }));
 
@@ -260,7 +261,6 @@ app.post("/api/signup", wrap(async (req, res) => {
   const thankful = clean(req.body?.thankful, 500);
   const hasMsg = !!(excited || thankful);
   const donation = Math.min(int(req.body?.donation), 1000);
-  const payTo = CASHTAGS.includes(req.body?.payTo) ? req.body.payTo : "";
   const hasCounts = Object.keys(counts).length > 0;
   if (!name) return res.status(400).json({ error: "Please add your name." });
   if (!items.length && !writeins.length && !hasCounts && !hasMsg && !donation) return res.status(400).json({ error: "Pick an item or type one in first." });
@@ -270,10 +270,20 @@ app.post("/api/signup", wrap(async (req, res) => {
   for (const w of writeins) await store.addExtra(name, w.dish, w.category, contact);
   for (const [item, qty] of Object.entries(counts)) await setCount(name, item, qty, contact);
   if (hasMsg) await store.setMessage(name, excited, thankful);
-  if (donation) await store.addExtra(name, String(donation), DONATION, [contact, payTo && `to $${payTo}`].filter(Boolean).join(" · "));
+  if (donation) await store.addExtra(name, String(donation), DONATION, payLabel(contact, req.body?.payTo));
   if (!claimed.length && !writeins.length && !hasCounts && !hasMsg && !donation) return res.status(409).json({ error: `Someone just claimed ${taken.join(", ")}. Pick something else?`, taken });
   res.json({ ok: true, claimed, taken, message: hasMsg, donation,
     added: [...writeins.map((w) => w.dish), ...Object.entries(counts).map(([i, q]) => `${q} ${COUNTS[i].unit} (${i})`)] });
+}));
+
+// Donation pledge on its own (pop-up and Who's Coming card). Private to hosts.
+app.post("/api/donate", wrap(async (req, res) => {
+  const name = clean(req.body?.name, 100);
+  const amount = Math.min(int(req.body?.amount), 1000);
+  if (!name) return res.status(400).json({ error: "Add your name so we can thank you." });
+  if (!amount) return res.status(400).json({ error: "Pick an amount first." });
+  await store.addExtra(name, String(amount), DONATION, payLabel(clean(req.body?.contact, 120), req.body?.payTo));
+  res.json({ ok: true });
 }));
 
 app.post("/api/extra", wrap(async (req, res) => {

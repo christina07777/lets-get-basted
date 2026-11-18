@@ -68,6 +68,8 @@
     <div class="divider"><svg aria-hidden="true"><use href="#spark"/></svg></div>
     <div id="people" aria-live="polite"><p class="empty">Loading the guest list…</p></div>
 
+    <div class="donate-mount" data-mode="standalone" style="margin:var(--space-6) 0"></div>
+
     <div class="spot right">
       <img src="/img/char-pilgrim.jpg" width="256" height="256" alt="The pilgrim turkey caught with a drumstick, pie, and rolls hidden under his hat.">
       <div><p class="joke">Caught red-handed.</p><p class="small">Claim your dish before this guy eats it.</p></div>
@@ -86,6 +88,7 @@
   </section>
   <nav class="site-nav bottom" aria-label="Party pages"></nav>
 </main>
+<script src="/donate.js"></script>
 <script>
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
