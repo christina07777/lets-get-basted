@@ -44,7 +44,12 @@
   .cashapp{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2)}
   .cash{font-size:15px;padding:10px 8px;min-height:46px}
   @media (max-width:380px){.cashapp{grid-template-columns:1fr}}
-  .item.chairs{align-items:flex-start;padding:12px}
+  .item.counted{align-items:flex-start;padding:12px}
+  .item.counted .what{flex:1;min-width:0}
+  .bar{height:8px;border-radius:99px;background:rgba(255,243,224,.12);margin:8px 0 0;overflow:hidden}
+  .bar span{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--gold-700),var(--gold-500))}
+  .spots{margin:4px 0 0;font:600 13px/1.4 var(--display);color:var(--cream-200);display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+  .spots svg{width:14px;height:14px}
   .chair-note{margin:6px 0 0;font:600 14px/1.4 var(--display);color:var(--cream-200)}
   .chair-who{margin:6px 0 0;font:700 13px/1.4 var(--display);color:var(--gold-500)}
   .qty{flex:none;width:92px;text-align:center}
@@ -80,6 +85,7 @@
       <h2 class="heading" style="margin-top:var(--space-3)">What are you bringing?</h2>
       <p class="small" style="margin:0 0 var(--space-3)">Tap <b>Pick</b> on what you’ll bring, or type something in, then hit <b>Submit</b> at the bottom. BYOB.</p>
       <span class="badge" id="count" aria-live="polite">Loading…</span>
+      <p class="small" id="goal-note" style="margin:var(--space-2) 0 0"></p>
     </div>
 
     <div class="you">
@@ -135,6 +141,12 @@
     <p class="joke center" style="margin-top:var(--space-8)">Stretchy pants recommended.</p>
   </section>
 
+  <section class="playlist" aria-labelledby="pl-h">
+    <svg class="note-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18.5a2.5 2.5 0 1 1-2-2.45V5.5l11-2.5v11.5a2.5 2.5 0 1 1-2-2.45V7.1l-7 1.6v9.8z"/></svg>
+    <div><h2 id="pl-h">Add to the playlist</h2>
+      <p>Help build the Friendsgiving soundtrack. Add the songs you want to hear (karaoke diva approved).</p>
+      <a class="btn btn-secondary" href="https://open.spotify.com/playlist/4Jliu98VSWwL240daEYfdh?si=YrcpM2NNQI-tC5Nm0pTx6A&amp;utm_source=copy-link&amp;pi=lNPE8MlIQRyb_&amp;pt=00809f64f69d12973f7eb3c48cab9ec9" target="_blank" rel="noopener">Add songs on Spotify</a></div>
+  </section>
   <p class="center"><a class="btn btn-secondary" href="/whos-coming">See who’s coming →</a></p>
   <p class="center small">Haven’t RSVP’d yet? <a href="/">RSVP here</a> · or text Shannon <a href="sms:+17542441524">(754) 244-1524</a> • Christina <a href="sms:+19548542207">(954) 854-2207</a></p>
 </main>
@@ -142,7 +154,7 @@
 <script>
 const $ = (s) => document.querySelector(s);
 const me = $("#me"), contact = $("#contact"), err = $("#err"), submitBtn = $("#submit");
-let mine = [], sel = new Set(), writeVals = {}, chairQty = 0, donation = 0, payTo = "", last = null;
+let mine = [], sel = new Set(), writeVals = {}, countVals = {}, donation = 0, payTo = "", last = null;
 try {
   const g = JSON.parse(localStorage.getItem("basted-guest") || "null");
   if (g) { me.value = g.name || ""; contact.value = g.phone || g.email || ""; }
@@ -168,46 +180,66 @@ async function load(force) {
 
 function render(d) {
   $("#count").textContent = `${d.claimed} of ${d.total} claimed`;
-  const open = new Set(d.categories.flatMap((c) => c.items.filter((i) => !i.by).map((i) => i.item)));
+  $("#goal-note").textContent = `Amounts are planned for ${d.headcount} guests and grow as more people RSVP.`;
+  const open = new Set(d.categories.flatMap((c) => c.items.filter((i) =>
+    (i.type === "single" && !i.by) || (i.type === "multi" && i.by.length < i.spots)).map((i) => i.item)));
   for (const s of [...sel]) if (!open.has(s)) sel.delete(s);
-  $("#list").innerHTML = d.categories.map((c) => `
+  const pickBtn = (item) => `<button type="button" class="pick" data-item="${esc(item)}" aria-pressed="${sel.has(item)}">${sel.has(item) ? "✓ Picked" : "Pick"}</button>`;
+  const row = (i) => {
+    if (i.type === "count") {
+      const pct = Math.min(100, Math.round((i.total / i.goal) * 100)), v = countVals[i.item] || 0, id = "q-" + slug(i.item);
+      return `<div class="item counted ${v ? "selected" : ""}">
+        <div class="what">${esc(i.item)}
+          ${i.note ? `<p class="chair-note">${esc(i.note)}</p>` : ""}
+          <div class="bar" role="img" aria-label="${i.total} of ${i.goal} ${esc(i.unit)}"><span style="width:${pct}%"></span></div>
+          <p class="chair-who">${i.total} of ${i.goal} ${esc(i.unit)}${i.total >= i.goal ? " · goal met, extras welcome!" : ""}${i.pledges.length ? ` · ${i.pledges.map((x) => `${esc(x.name)} (${x.qty})`).join(", ")}` : ""}</p>
+        </div>
+        <div class="qty"><label for="${id}">How many?</label>
+          <input type="number" id="${id}" data-count="${esc(i.item)}" inputmode="numeric" min="0" max="50" placeholder="0" value="${v || ""}"></div>
+      </div>`;
+    }
+    if (i.type === "multi") {
+      const left = i.spots - i.by.length;
+      return `<div class="item ${sel.has(i.item) ? "selected" : ""} ${i.by.some((n) => mine.includes(i.item)) ? "mine" : ""}">
+        <div class="what">${esc(i.item)}
+          <p class="spots">${i.by.length ? `<svg aria-hidden="true"><use href="#check"/></svg>${i.by.map(esc).join(", ")} · ` : ""}${left > 0 ? `${left} of ${i.spots} spots open` : "all spots taken"}</p></div>
+        ${left > 0 ? pickBtn(i.item) : ""}
+      </div>`;
+    }
+    return i.by ? `<div class="item ${mine.includes(i.item) ? "mine" : ""}">
+        <span class="what">${esc(i.item)}</span>
+        <span class="who"><svg aria-hidden="true"><use href="#check"/></svg>${esc(i.by)}</span></div>`
+      : `<div class="item ${sel.has(i.item) ? "selected" : ""}"><span class="what">${esc(i.item)}</span>${pickBtn(i.item)}</div>`;
+  };
+  $("#list").innerHTML = d.categories.map((c) => {
+    const slots = c.items.filter((i) => i.type !== "count");
+    const total = slots.reduce((n, i) => n + (i.type === "multi" ? i.spots : 1), 0);
+    const filled = slots.reduce((n, i) => n + (i.type === "multi" ? Math.min(i.by.length, i.spots) : i.by ? 1 : 0), 0);
+    const counts = c.items.filter((i) => i.type === "count");
+    const met = counts.filter((i) => i.total >= i.goal).length;
+    return `
     <div class="cat">
       <div class="cat-head">
         <div class="rule"><svg aria-hidden="true"><use href="#spark"/></svg><h3>${esc(c.name)}</h3><svg aria-hidden="true"><use href="#spark"/></svg></div>
-        <p class="cat-count">${c.items.filter((i) => i.by).length} of ${c.items.length} claimed${c.extras.length ? ` · ${c.extras.length} extra` : ""}${c.chairs && c.chairs.total ? ` · ${c.chairs.total} chairs pledged` : ""}</p>
+        <p class="cat-count">${filled} of ${total} claimed${counts.length ? ` · ${met} of ${counts.length} goals met` : ""}${c.extras.length ? ` · ${c.extras.length} extra` : ""}</p>
       </div>
-      ${c.chairs ? `
-        <div class="item chairs ${chairQty ? "selected" : ""}">
-          <div class="what">${esc(c.chairs.label)}
-            <p class="chair-note">${esc(c.chairs.note)}</p>
-            <p class="chair-who">${c.chairs.total ? `${c.chairs.total} pledged so far: ${c.chairs.pledges.map((x) => `${esc(x.name)} (${x.qty})`).join(", ")}` : "None pledged yet"}</p>
-          </div>
-          <div class="qty"><label for="chair-qty">How many?</label>
-            <input type="number" id="chair-qty" inputmode="numeric" min="0" max="50" placeholder="0" value="${chairQty || ""}"></div>
-        </div>` : ""}
-      ${c.items.map((i) => i.by ? `
-        <div class="item ${mine.includes(i.item) ? "mine" : ""}">
-          <span class="what">${esc(i.item)}</span>
-          <span class="who"><svg aria-hidden="true"><use href="#check"/></svg>${esc(i.by)}</span>
-        </div>` : `
-        <div class="item ${sel.has(i.item) ? "selected" : ""}">
-          <span class="what">${esc(i.item)}</span>
-          <button type="button" class="pick" data-item="${esc(i.item)}" aria-pressed="${sel.has(i.item)}">${sel.has(i.item) ? "✓ Picked" : "Pick"}</button>
-        </div>`).join("")}
+      ${c.items.map(row).join("")}
       ${c.extras.map((x) => `
         <div class="item"><span class="what">${esc(x.dish)}</span>
           <span class="who"><svg aria-hidden="true"><use href="#check"/></svg>${esc(x.name)}</span></div>`).join("")}
       ${c.writeIn ? `
         <div class="writein"><label for="w-${slug(c.name)}">Bringing something else? Type it here</label>
           <input type="text" id="w-${slug(c.name)}" data-cat="${esc(c.name)}" maxlength="200" placeholder="Something else for ${esc(c.name.toLowerCase())}" value="${esc(writeVals[c.name] || "")}"></div>` : ""}
-    </div>`).join("");
+    </div>`;
+  }).join("");
   $("#extras").innerHTML = d.extras.map((x) => `<li><span class="small">✦</span> <b>${esc(x.dish)}</b> <span class="muted">— ${esc(x.name)}</span></li>`).join("");
   $("#other-h").classList.toggle("hidden", !d.extras.length);
   updateSummary();
 }
 
 function updateSummary() {
-  const picks = [...sel, ...Object.values(writeVals).map((v) => v.trim()).filter(Boolean), ...(chairQty ? [`${chairQty} folding chair${chairQty > 1 ? "s" : ""}`] : [])];
+  const picks = [...sel, ...Object.values(writeVals).map((v) => v.trim()).filter(Boolean),
+    ...Object.entries(countVals).filter(([, q]) => q > 0).map(([i, q]) => `${q} × ${i}`)];
   const extra = [($("#excited").value.trim() || $("#thankful").value.trim()) ? "a comment" : "", donation ? `a $${donation} donation` : ""].filter(Boolean).join(" + ");
   $("#summary").textContent = picks.length ? `You’re bringing: ${picks.join(", ")}${extra ? " + " + extra : ""}` : extra ? `Ready to submit ${extra}.` : "Pick items above or type something in, then submit.";
 }
@@ -242,9 +274,10 @@ document.querySelectorAll(".amt").forEach((b) => b.addEventListener("click", () 
 $("#amt-other").addEventListener("input", (e) => setAmount(e.target.value));
 document.querySelectorAll(".cash").forEach((a) => a.addEventListener("click", () => { payTo = a.dataset.tag; }));
 $("#list").addEventListener("input", (e) => {
-  if (e.target.id === "chair-qty") {
-    chairQty = Math.max(0, Math.min(50, parseInt(e.target.value, 10) || 0));
-    e.target.closest(".item").classList.toggle("selected", chairQty > 0); updateSummary(); return;
+  if (e.target.dataset.count) {
+    const q = Math.max(0, Math.min(50, parseInt(e.target.value, 10) || 0));
+    countVals[e.target.dataset.count] = q;
+    e.target.closest(".item").classList.toggle("selected", q > 0); updateSummary(); return;
   }
   if (e.target.dataset.cat) { writeVals[e.target.dataset.cat] = e.target.value; updateSummary(); }
 });
@@ -255,11 +288,12 @@ submitBtn.addEventListener("click", async () => {
   const items = [...sel];
   if (!me.value.trim()) { err.textContent = "Add your name at the top first."; me.focus(); me.scrollIntoView({ block: "center" }); return; }
   const excited = $("#excited").value.trim(), thankful = $("#thankful").value.trim();
-  if (!items.length && !writeins.length && !chairQty && !excited && !thankful && !donation) { err.textContent = "Pick something, type it in, or add a comment first."; return; }
+  const counts = Object.fromEntries(Object.entries(countVals).filter(([, q]) => q > 0));
+  if (!items.length && !writeins.length && !Object.keys(counts).length && !excited && !thankful && !donation) { err.textContent = "Pick something, type it in, or add a comment first."; return; }
   submitBtn.disabled = true; submitBtn.textContent = "Submitting…";
   try {
     const r = await fetch("/api/signup", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: me.value, contact: contact.value, items, writeins, chairs: chairQty, excited, thankful, donation, payTo }) });
+      body: JSON.stringify({ name: me.value, contact: contact.value, items, writeins, counts, excited, thankful, donation, payTo }) });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.error || "Couldn’t submit. Please try again.");
     mine.push(...j.claimed);
@@ -267,7 +301,7 @@ submitBtn.addEventListener("click", async () => {
       localStorage.setItem("basted-claims", JSON.stringify(mine));
       const g = JSON.parse(localStorage.getItem("basted-guest") || "{}"); g.name = me.value.trim(); localStorage.setItem("basted-guest", JSON.stringify(g));
     } catch (e2) {}
-    sel.clear(); writeVals = {}; chairQty = 0;
+    sel.clear(); writeVals = {}; countVals = {};
     const got = [...j.claimed, ...j.added];
     if (j.message) { $("#excited").value = ""; $("#thankful").value = ""; }
     const thanks = [j.message ? "Comment posted!" : "", j.donation ? "Thank you for chipping in!" : ""].filter(Boolean).join(" ");

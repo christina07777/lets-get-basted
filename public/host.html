@@ -21,7 +21,7 @@
 <body>
 <main class="page">
   <section class="card">
-    <div class="center"><p class="eyebrow">Hosts only</p><h1 class="page-title">Party Dashboard</h1><p class="small"><a href="/whos-coming">Public “Who’s Coming” page →</a></p></div>
+    <div class="center"><p class="eyebrow">Hosts only</p><h1 class="page-title">Party Dashboard</h1><p class="small"><a href="/whos-coming">Public “Who’s Coming” page →</a> · <a href="https://open.spotify.com/playlist/4Jliu98VSWwL240daEYfdh?si=YrcpM2NNQI-tC5Nm0pTx6A&amp;utm_source=copy-link&amp;pi=lNPE8MlIQRyb_&amp;pt=00809f64f69d12973f7eb3c48cab9ec9" target="_blank" rel="noopener">Party playlist →</a></p></div>
 
     <form id="login" style="margin-top:var(--space-6)">
       <div class="field"><label for="key">Host key</label><input type="text" id="key" autocomplete="off" placeholder="The ADMIN_KEY you set on Render"></div>
@@ -41,7 +41,7 @@
       <h2 class="label-caps">RSVPs</h2><div id="rsvps"></div>
       <h2 class="label-caps">Potluck claims</h2><div id="claims"></div>
       <h2 class="label-caps">Donations (private)</h2><div id="dons"></div>
-      <h2 class="label-caps">Folding chairs</h2><div id="chairs"></div>
+      <h2 class="label-caps">Quantities (goal for <span id="hc">30</span> guests)</h2><div id="chairs"></div>
       <h2 class="label-caps">Fill-in items</h2><div id="extras"></div>
       <h2 class="label-caps">Comments</h2><div id="msgs"></div>
     </div>
@@ -71,7 +71,7 @@ function render() {
       ${m.excited ? `<p class="small">Excited: ${esc(m.excited)}</p>` : ""}${m.thankful ? `<p class="small">Thankful: ${esc(m.thankful)}</p>` : ""}</div>
       <button class="x" data-del-msg="${m.id}">Remove</button></div></div>`).join("") || `<p class="small">No comments yet.</p>`;
   $("#s-guests").textContent = data.guests; $("#s-chairs").textContent = data.chairs;
-  $("#s-items").textContent = `${data.claims.length}/${data.totalItems}`;
+  $("#s-items").textContent = `${data.claimedSlots}/${data.totalItems}`;
   $("#rsvps").innerHTML = data.rsvps.map((r) => `<div class="entry"><div class="top"><div>
       <b>${esc(r.name)}</b> ${r.attending ? `<span class="success">· coming (${r.party_size || "?"})</span>` : `<span class="muted">· can’t make it</span>`}
       ${r.guest_names ? `<p class="small">${esc(r.guest_names)}</p>` : ""}
@@ -83,10 +83,11 @@ function render() {
   $("#s-don").textContent = `$${data.donations || 0}`;
   $("#dons").innerHTML = data.extras.filter((x) => x.category === "Donation").map((x) => `<div class="entry"><div class="top"><div><b>$${esc(x.dish)}</b> — ${esc(x.name)}${x.contact ? `<p class="small">${esc(x.contact)}</p>` : ""}</div>
       <button class="x" data-del-extra="${x.id}">Remove</button></div></div>`).join("") || `<p class="small">No donations pledged yet.</p>`;
-  const chairRows = data.extras.filter((x) => x.category === "Folding chairs");
-  $("#chairs").innerHTML = chairRows.map((x) => `<div class="entry"><div class="top"><div><b>${esc(x.dish)} chair(s)</b> — ${esc(x.name)}${x.contact ? `<p class="small">${esc(x.contact)}</p>` : ""}</div>
-      <button class="x" data-del-extra="${x.id}">Remove</button></div></div>`).join("") || `<p class="small">No chairs pledged yet.</p>`;
-  $("#extras").innerHTML = data.extras.filter((x) => x.category !== "Folding chairs" && x.category !== "Donation").map((x) => `<div class="entry"><div class="top"><div><b>${x.category === "Folding chairs" ? `${esc(x.dish)} folding chair(s)` : esc(x.dish)}</b> — ${esc(x.name)}${x.category ? `<p class="small">${esc(x.category)}${x.contact ? ` · ${esc(x.contact)}` : ""}</p>` : ""}</div>
+  $("#hc").textContent = data.headcount;
+  $("#chairs").innerHTML = data.counts.map((c) => `<div class="entry"><b>${esc(c.item)}</b> <span class="${c.total >= c.goal ? "success" : "muted"}">· ${c.total} of ${c.goal} ${esc(c.unit)}</span>
+      ${c.pledges.map((x) => `<div class="top" style="margin-top:6px"><p class="small" style="margin:0">${esc(x.name)}: ${x.qty}${x.contact ? ` · ${esc(x.contact)}` : ""}</p>
+        <button class="x" data-del-extra="${x.id}">Remove</button></div>`).join("")}</div>`).join("");
+  $("#extras").innerHTML = data.extras.filter((x) => !data.countItems.includes(x.category) && x.category !== "Donation").map((x) => `<div class="entry"><div class="top"><div><b>${x.category === "Folding chairs" ? `${esc(x.dish)} folding chair(s)` : esc(x.dish)}</b> — ${esc(x.name)}${x.category ? `<p class="small">${esc(x.category)}${x.contact ? ` · ${esc(x.contact)}` : ""}</p>` : ""}</div>
       <button class="x" data-del-extra="${x.id}">Remove</button></div></div>`).join("") || `<p class="small">None yet.</p>`;
 }
 $("#login").addEventListener("submit", (e) => { e.preventDefault(); key = $("#key").value.trim(); load(); });
@@ -111,9 +112,9 @@ function confirmInline(btn) {
 $("#copy").addEventListener("click", async () => {
   const L = ["LET’S GET BASTED! — Friendsgiving Potluck", `Guests coming: ${data.guests} · Chairs: ${data.chairs}`, "", "RSVPs:"];
   data.rsvps.forEach((r) => L.push(`- ${r.name}: ${r.attending ? `coming (${r.party_size || "?"})` : "can’t make it"}${r.guest_names ? ` — ${r.guest_names}` : ""}${r.phone ? ` · ${r.phone}` : ""}${r.email ? ` · ${r.email}` : ""}${r.notes ? ` · Note: ${r.notes}` : ""}`));
-  L.push("", "Folding chairs:"); data.extras.filter((x) => x.category === "Folding chairs").forEach((x) => L.push(`- ${x.name}: ${x.dish}`));
+  L.push("", `Quantities (goals for ${data.headcount} guests):`); data.counts.forEach((c) => L.push(`- ${c.item}: ${c.total}/${c.goal} ${c.unit}${c.pledges.length ? " — " + c.pledges.map((x) => `${x.name} (${x.qty})`).join(", ") : ""}`));
   L.push("", "Potluck:"); data.claims.forEach((c) => L.push(`- ${c.item} — ${c.name}`));
-  const fill = data.extras.filter((x) => x.category !== "Folding chairs" && x.category !== "Donation");
+  const fill = data.extras.filter((x) => !data.countItems.includes(x.category) && x.category !== "Donation");
   L.push("", `Donations pledged: $${data.donations || 0}`); data.extras.filter((x) => x.category === "Donation").forEach((x) => L.push(`- ${x.name}: $${x.dish}${x.contact ? ` (${x.contact})` : ""}`));
   if (fill.length) { L.push("", "Extras:"); fill.forEach((x) => L.push(x.category === "Folding chairs" ? `- ${x.dish} folding chair(s) — ${x.name}` : `- ${x.dish} — ${x.name}${x.category ? ` (${x.category})` : ""}`)); }
   try { await navigator.clipboard.writeText(L.join("\n")); $("#copy").textContent = "Copied!"; } catch (e) { $("#copy").textContent = "Couldn’t copy"; }

@@ -95,3 +95,11 @@ input:focus,textarea:focus,button:focus-visible,a:focus-visible{outline:2px soli
   font:900 13px/1 var(--display);letter-spacing:.12em;text-transform:uppercase;color:var(--gold-500)}
 .hidden{display:none!important}
 footer{text-align:center;margin-top:var(--space-6)}
+
+/* Playlist card */
+.playlist{display:flex;align-items:center;gap:var(--space-4);margin:0 0 var(--space-8);padding:var(--space-4) var(--space-6);
+  border-radius:var(--radius-lg);background:var(--cranberry-900);border:1.5px solid rgba(217,164,65,.6);box-shadow:var(--card);text-align:left}
+.playlist .note-ic{width:44px;height:44px;flex:none;fill:var(--gold-500);filter:drop-shadow(0 0 10px rgba(255,179,71,.4))}
+.playlist h2{margin:0;font:900 15px/1.2 var(--display);letter-spacing:.12em;text-transform:uppercase;color:var(--gold-500)}
+.playlist p{margin:4px 0 var(--space-3);font:600 14px/1.4 var(--display);color:var(--cream-200)}
+.playlist .btn{min-height:44px;padding:8px 18px;font-size:15px}
