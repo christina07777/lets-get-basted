@@ -153,6 +153,8 @@ function makeStore() {
 const store = makeStore();
 const app = express();
 app.use(express.json({ limit: "20kb" }));
+// Keep the party pages out of search engines (address + guest names).
+app.use((_req, res, next) => { res.set("X-Robots-Tag", "noindex, nofollow"); next(); });
 app.use(express.static(path.join(__dirname, "public"), { extensions: ["html"] }));
 
 const wrap = (fn) => (req, res) => fn(req, res).catch((e) => { console.error(e); res.status(500).json({ error: "Something went wrong. Please try again." }); });
